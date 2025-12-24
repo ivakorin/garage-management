@@ -263,4 +263,4 @@ backend/db/database.db
 mosquitto/config/*
 mosquitto/data/*
 mosquitto/log/*
-redis/data
+redis/data/*
