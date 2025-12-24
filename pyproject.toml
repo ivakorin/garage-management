@@ -1,0 +1,92 @@
+[project]
+name = "GM"
+version = "0.1.0"
+description = "Tools for remote garage management"
+authors = [
+    { name = "ivakorin", email = "werewolfe@yandex.ru" }
+]
+readme = "README.md"
+requires-python = ">=3.13, <4.0"
+dependencies = [
+    "fastapi (>=0.127.0,<0.128.0)",
+    "pydantic-settings (>=2.12.0,<3.0.0)",
+    "python-multipart (>=0.0.21,<0.0.22)",
+    "pytest (>=9.0.2,<10.0.0)",
+    "sqlalchemy (>=2.0.45,<3.0.0)",
+    "aiomqtt (>=2.4.0,<3.0.0)",
+    "redis (>=7.1.0,<8.0.0)",
+    "aiosqlite (>=0.22.0,<0.23.0)",
+    "uvicorn (>=0.40.0,<0.41.0)",
+]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.3.5"
+mypy = "^1.16.0"
+black = "^25.1.0"
+pytest-asyncio = "^1.0.0"
+httpx = "^0.28.1"
+coverage = "^7.8.2"
+pytest-dotenv = "^0.5.2"
+testcontainers = { extras = ["postgres", "redis"], version = "^4.10.0" }
+isort = "^6.0.1"
+pylint = "^3.3.7"
+bandit = { extras = ["toml"], version = "^1.8.6" }
+asgi-lifespan = "^2.1.0"
+pytest-json-report = "^1.5.0"
+pytest-cov = "^7.0.0"
+pytest-mock = "^3.15.1"
+
+[tool.black]
+line-length = 90
+target-version = ["py311", "py312", "py313", "py314"]
+include = '\.py$|__init__\.py'
+exclude = '''
+(
+    /(
+        \.idea|
+        _build|
+        buck-out|
+        build|
+        dist
+    )/
+    | migrations
+    | \.md$
+    | \.toml$
+)
+'''
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_reexport = true
+
+
+[tool.pytest.ini_options]
+pythonpath = ". backend"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+env_files = ".env_test"
+
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = '''
+    missing-docstring,
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring
+'''
