@@ -17,14 +17,12 @@ class DS18B20MuxPlugin(DevicePlugin):
     def __init__(
         self,
         device_id: str,
-        mqtt_client,
-        db_session,
         num_sensors: int = 4,
-        base_temp: float = 25.0,
-        temp_variation: float = 2.0,
+        base_temp: float = 5.0,
+        temp_variation: float = 20.0,
         poll_interval: float = 5.0
     ):
-        super().__init__(device_id, mqtt_client, db_session, poll_interval)
+        super().__init__(device_id, poll_interval)
         self.num_sensors = num_sensors
         self.base_temp = base_temp
         self.temp_variation = temp_variation
@@ -40,7 +38,7 @@ class DS18B20MuxPlugin(DevicePlugin):
         data = {}
         for sensor_id in range(self.num_sensors):
             if self.sensor_states[sensor_id]["online"]:
-                temp = self.base_temp + random.uniform(-self.temp_variation, self.temp_variation)
+                temp = self.base_temp + random.uniform(self.base_temp, self.temp_variation)
                 temp = round(temp, 1)
                 self.sensor_states[sensor_id]["last_temp"] = temp
                 data[f"sensor_{sensor_id}"] = temp
@@ -67,5 +65,3 @@ class DS18B20MuxPlugin(DevicePlugin):
                 logger.info(f"Базовая температура изменена на {self.base_temp}°C")
         else:
             logger.warning(f"Неизвестная команда: {command}")
-
-    # _save_to_db() и start() наследуются от DevicePlugin — нет нужды переопределять!

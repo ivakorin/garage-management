@@ -2,97 +2,85 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+import redis.asyncio as redis
 from fastapi import FastAPI, HTTPException
+from starlette.middleware.cors import CORSMiddleware
+from starlette.websockets import WebSocket
 
 from core.settings import settings
 from db.database import init_db, async_session_context  # Добавляем async_session_context
 from models import *  # noqa
-from services.mqtt_client import AsyncMQTTClient
 from services.plugins import load_plugins
+from services.ws_manager import ws_manager
+from tasks.data_collector import DataCollector
 
 logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-mqtt_client = AsyncMQTTClient(
-    broker=settings.mqtt.host,
-    port=settings.mqtt.port,
-    username=settings.mqtt.username,
-    password=settings.mqtt.password
-)
+
 plugins = {}  # Глобальный словарь для хранения плагинов
-
-
-
-async def handle_command(command: dict):
-    device_id = command.get("device_id")
-    if device_id in plugins:
-        try:
-            await plugins[device_id].handle_command(command)
-            logger.info(f"Command executed for {device_id}: {command}")
-        except Exception as e:
-            logger.error(f"Error executing command for {device_id}: {e}")
-    else:
-        logger.warning(f"Plugin not found for device_id: {device_id}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    collect_task = None
+    redis_client = None
     try:
         await init_db()
         logger.info("Database initialized")
-
-        await mqtt_client.connect()
-        await asyncio.sleep(5)
-        if not mqtt_client._is_connected:
-            raise ConnectionError("MQTT client failed to connect")
-        logger.info("MQTT client connected")
-
-
-        mqtt_client.subscribe("commands/+/action", handle_command)
-        logger.info("MQTT subscriptions set up")
-
-        # Получаем сессию для всех плагинов
-        async with async_session_context() as db_session:  # ← Создаём единую сессию
-            loaded_plugins = await load_plugins(db_session, mqtt_client)  # ← Передаём её в загрузку плагинов
+        await ws_manager.startup()
+        async with async_session_context() as db_session:
+            loaded_plugins = await load_plugins(db_session)
+            plugins.clear()
             plugins.update(loaded_plugins)
-            logger.info(f"Loaded {len(loaded_plugins)} plugins")
-
-            logger.info("FastAPI app ready to serve requests")
-            yield  # ← Здесь стартует HTTP-сервер
-
-            # Блок finally выполняется после остановки сервера
+            active_db_session = db_session
+        plugins_list = list(plugins.values())
+        redis_client = redis.Redis(
+            host=settings.redis.host,
+            port=settings.redis.port,
+            db=settings.redis.db,
+        )
+        data_collector = DataCollector(
+            plugins=plugins_list,
+            db_session=active_db_session,
+            redis_client=redis_client
+        )
+        collect_task = asyncio.create_task(data_collector.collect())
+        logger.info("DataCollector task created")
+        yield
 
     except Exception as e:
-        logger.error(f"Lifespan startup error: {e}")
-        raise
-
+        logger.error(f"Lifespan error: {e}", exc_info=True)
     finally:
-        logger.info("FastAPI app shutting down")
-
-        try:
-            await mqtt_client.unsubscribe("commands/+/action")
-        except Exception as e:
-            logger.warning(f"Failed to unsubscribe: {e}")
-
-        try:
-            await asyncio.wait_for(mqtt_client.disconnect(), timeout=10.0)
-        except asyncio.TimeoutError:
-            logger.error("MQTT disconnect timed out")
-        except Exception as e:
-            logger.error(f"MQTT disconnect error: {e}")
-
-        for plugin_id, plugin in plugins.items():
+        if collect_task:
+            collect_task.cancel()
             try:
-                await asyncio.wait_for(plugin.stop(), timeout=10.0)
-                logger.info(f"Plugin {plugin_id} stopped")
-            except asyncio.TimeoutError:
-                logger.error(f"Plugin {plugin_id} did not stop in time")
-            except Exception as e:
-                logger.error(f"Error stopping plugin {plugin_id}: {e}")
+                await collect_task
+            except asyncio.CancelledError:
+                pass
+        if redis_client:
+            await redis_client.close()
+        if ws_manager:
+            await ws_manager.shutdown()
+        logger.info("Application shutdown complete")
 
-        logger.info("Cleanup completed")
+
+
+
+
+app.router.lifespan = lifespan
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    # Явно разрешаем WebSocket
+    allow_origin_regex=".*",  # Если нужны сложные шаблоны
+)
 
 @app.get("/plugins")
 def list_plugins():
@@ -114,3 +102,16 @@ async def send_command(device_id: str, command: dict):
         return {"status": "command sent", "device_id": device_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            # Можно принимать команды от клиента (если нужно)
+            data = await websocket.receive_text()
+            logger.debug(f"Получено от клиента: {data}")
+    except Exception as e:
+        logger.warning(f"Клиент отключился: {e}")
+    finally:
+        ws_manager.disconnect(websocket)

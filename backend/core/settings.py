@@ -22,7 +22,7 @@ class Redis(BaseSettings):
     @property
     def url(self) -> str:
         escaped_password = quote(self.password, safe='')
-        return f"redis://:{escaped_password}@{self.host}:{self.port}/{self.db}"
+        return f"redis://{self.host}:{self.port}/{self.db}"
 
 class Log(BaseSettings):
     level: str

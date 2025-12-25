@@ -1,12 +1,10 @@
-from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
 
-class DeviceDataCreateSchema(BaseModel):
-    device_id:str
-    device_name:str
-    timestamp:datetime
-    data: str
-    value: Optional[float]
+class SensorMessage(BaseModel):
+    device_id: str
+    timestamp: str
+    data: Dict[str, Any]
+    value: Optional[float] = None
