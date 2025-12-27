@@ -4,10 +4,10 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, Any, AsyncGenerator
 
+from crud.plugins import Plugins
 from schemas.sensor import SensorMessage
 
 logger = logging.getLogger(__name__)
-
 
 
 class DevicePlugin(ABC):
@@ -26,7 +26,6 @@ class DevicePlugin(ABC):
 
     def __init__(self, device_id: str, poll_interval: float = 1.0):
         self.device_id = device_id
-        self.is_running = False
         self.poll_interval = max(poll_interval, 0.1)
 
     @abstractmethod
@@ -50,16 +49,16 @@ class DevicePlugin(ABC):
     async def start(self) -> AsyncGenerator[SensorMessage, Any]:
         """Запуск плагина — возвращает асинхронный генератор данных."""
         await self.init_hardware()
-        self.is_running = True
         logger.info(f"Плагин {self.device_id} запущен")
-
-        while self.is_running:
+        while await Plugins.is_running(self.device_id):
             try:
                 data = await self.read_data()
                 if data:
-                    result = SensorMessage(device_id=self.device_id,
-                                           timestamp=datetime.now().isoformat(),
-                                           data=data)
+                    result = SensorMessage(
+                        device_id=self.device_id,
+                        timestamp=datetime.now().isoformat(),
+                        data=data,
+                    )
                     # Возвращаем данные с метаинформацией
                     yield result
             except Exception as e:

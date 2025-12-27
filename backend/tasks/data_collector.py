@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import logging
@@ -18,13 +17,12 @@ from services.mqtt_client import AsyncMQTTClient
 logger = logging.getLogger(__name__)
 
 
-
 class DataCollector:
     def __init__(
-            self,
-            plugins: list[DevicePlugin],
-            db_session: AsyncSession,
-            redis_client: Optional[redis.Redis] = None,  # Может быть None
+        self,
+        plugins: list[DevicePlugin],
+        db_session: AsyncSession,
+        redis_client: Optional[redis.Redis] = None,  # Может быть None
     ):
         self.plugins = plugins
         self.db_session = db_session
@@ -67,7 +65,6 @@ class DataCollector:
         try:
             while self._is_running:
                 for plugin in self.plugins:
-                    logger.debug(f"{plugin.device_id}.is_running = {plugin.is_running}")
                     try:
                         generator = plugin_generators[plugin.device_id]
 
@@ -78,25 +75,20 @@ class DataCollector:
                             # 1. Сохраняем в БД (всегда)
                             await self._save_to_db(message)
 
-                            # 2. Пытаемся отправить в MQTT
-                            await self._publish_to_mqtt(message)
-
-                            # 3. Пытаемся отправить в Redis
-                            await self._publish_to_redis(message)
-
                         except StopAsyncIteration:
-                            logger.warning(f"Генератор {plugin.device_id} завершён, пересоздаём")
+                            logger.warning(f"Генератор {plugin.device_id} завершён")
                             plugin_generators[plugin.device_id] = plugin.start()
+                            continue
                         except Exception as e:
                             logger.error(
                                 f"Ошибка при чтении из генератора {plugin.device_id}: {type(e).__name__}: {e}",
-                                exc_info=True
+                                exc_info=True,
                             )
 
                     except Exception as e:
                         logger.error(
                             f"Ошибка работы с плагином {plugin.device_id}: {type(e).__name__}: {e}",
-                            exc_info=True
+                            exc_info=True,
                         )
                         continue
 
@@ -143,21 +135,28 @@ class DataCollector:
                     device_id=message.device_id,
                     timestamp=datetime.fromisoformat(message.timestamp),
                     data=json.dumps(message.data),
-                    value=numeric_value
+                    value=numeric_value,
                 )
                 self.db_session.add(db_data)
                 await self.db_session.commit()
                 logger.info(f"Данные сохранены для устройства {message.device_id}")
                 message.value = numeric_value
+                # 1. Пытаемся отправить в Redis
+                await self._publish_to_redis(message)
+                # 1. Пытаемся отправить в MQTT
+                await self._publish_to_mqtt(message)
             else:
-                logger.debug(f"Данные не изменились для устройства {message.device_id}, пропуск сохранения")
-
+                logger.debug(
+                    f"Данные не изменились для устройства {message.device_id}, пропуск сохранения"
+                )
 
         except Exception as e:
             logger.error(f"Ошибка сохранения в БД: {e}")
             await self.db_session.rollback()
 
-    def _is_data_changed(self, last_data: Optional[DeviceData], new_data: Dict[str, Any]) -> bool:
+    def _is_data_changed(
+        self, last_data: Optional[DeviceData], new_data: Dict[str, Any]
+    ) -> bool:
         if last_data is None:
             return True
         last_data_dict = json.loads(last_data.data)
@@ -176,10 +175,7 @@ class DataCollector:
         try:
             # Проверяем подключение (ping)
             await self.redis_client.ping()
-            await self.redis_client.publish(
-                "sensor_updates",
-                message.model_dump_json()
-            )
+            await self.redis_client.publish("sensor_updates", message.model_dump_json())
             logger.debug(f"Отправлено в Redis: sensor_updates → {message.device_id}")
         except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.error(f"Ошибка подключения к Redis: {e}. Будет повторная попытка.")
@@ -219,4 +215,7 @@ class DataCollector:
             logger.error(f"Разрыв соединения MQTT: {e}. Будет попытка переподключения.")
             # Клиент останется в состоянии "не подключён" — следующее сообщение вызовет reconnect
         except Exception as e:
-            logger.error(f"Неожиданная ошибка при публикации в MQTT: {type(e).__name__}: {e}", exc_info=True)
+            logger.error(
+                f"Неожиданная ошибка при публикации в MQTT: {type(e).__name__}: {e}",
+                exc_info=True,
+            )

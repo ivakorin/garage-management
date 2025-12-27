@@ -7,7 +7,6 @@ from .template import DevicePlugin
 logger = logging.getLogger(__name__)
 
 
-
 class DS18B20MuxPlugin(DevicePlugin):
     """
     Плагин для имитации DS18B20, подключённого через CD74HC4067.
@@ -20,7 +19,7 @@ class DS18B20MuxPlugin(DevicePlugin):
         num_sensors: int = 4,
         base_temp: float = 5.0,
         temp_variation: float = 20.0,
-        poll_interval: float = 5.0
+        poll_interval: float = 5.0,
     ):
         super().__init__(device_id, poll_interval)
         self.num_sensors = num_sensors
@@ -29,7 +28,9 @@ class DS18B20MuxPlugin(DevicePlugin):
         self.sensor_states = {}
 
     async def init_hardware(self):
-        logger.info(f"Инициализация виртуального мультиплексора для {self.num_sensors} датчиков")
+        logger.info(
+            f"Инициализация виртуального мультиплексора для {self.num_sensors} датчиков"
+        )
         for i in range(self.num_sensors):
             self.sensor_states[i] = {"online": True, "last_temp": self.base_temp}
         logger.info("Виртуальное железо готово")
@@ -38,7 +39,9 @@ class DS18B20MuxPlugin(DevicePlugin):
         data = {}
         for sensor_id in range(self.num_sensors):
             if self.sensor_states[sensor_id]["online"]:
-                temp = self.base_temp + random.uniform(self.base_temp, self.temp_variation)
+                temp = self.base_temp + random.uniform(
+                    self.base_temp, self.temp_variation
+                )
                 temp = round(temp, 1)
                 self.sensor_states[sensor_id]["last_temp"] = temp
                 data[f"sensor_{sensor_id}"] = temp

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.logging import log
+from crud.plugins import Plugins
 from models.plugins import PluginRegistry
 from plugins.template import DevicePlugin
 
@@ -35,24 +36,31 @@ async def load_plugins(db_session: AsyncSession) -> dict:
                         result = await db_session.execute(
                             select(PluginRegistry).where(
                                 PluginRegistry.module_name == module_name,
-                                PluginRegistry.class_name == attr
+                                PluginRegistry.class_name == attr,
                             )
                         )
                         registry = result.scalars().first()
 
                         if registry:
                             device_id = registry.device_id
-                            log.debug(f"Found existing device_id: {device_id} for {registry_key}")
+                            log.debug(
+                                f"Found existing device_id: {device_id} for {registry_key}"
+                            )
+                            if not await Plugins.is_running(device_id):
+                                continue
                         else:
                             device_id = f"{filename[:-3]}_{uuid.uuid4().hex[:8]}"
                             registry = PluginRegistry(
                                 module_name=module_name,
                                 class_name=attr,
-                                device_id=device_id
+                                device_id=device_id,
+                                is_running=True,
                             )
                             db_session.add(registry)
                             await db_session.commit()
-                            log.info(f"Registered new device_id: {device_id} for {registry_key}")
+                            log.info(
+                                f"Registered new device_id: {device_id} for {registry_key}"
+                            )
 
                         # Собираем аргументы для инициализации
                         kwargs = {"device_id": device_id}
@@ -75,12 +83,11 @@ async def load_plugins(db_session: AsyncSession) -> dict:
     return plugins
 
 
-async def _run_plugin(plugin: DevicePlugin):
-    """Обёртка для запуска плагина с обработкой исключений."""
-    try:
-        # Используем async for для перебора значений генератора
-        async for _ in plugin.start():
-            pass  # Данные обрабатываются в DataCollector, здесь просто ждём
-    except Exception as e:
-        log.error(f"Plugin {plugin.device_id} crashed: {e}")
-
+# async def _run_plugin(plugin: DevicePlugin):
+#     """Обёртка для запуска плагина с обработкой исключений."""
+#     try:
+#         # Используем async for для перебора значений генератора
+#         async for _ in plugin.start():
+#             pass  # Данные обрабатываются в DataCollector, здесь просто ждём
+#     except Exception as e:
+#         log.error(f"Plugin {plugin.device_id} crashed: {e}")

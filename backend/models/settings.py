@@ -6,10 +6,11 @@ from db.database import Base
 
 class SystemSetting(Base):
     """Глобальные настройки системы."""
+
     __tablename__ = "system_settings"
 
-    key:Mapped[str]= mapped_column(primary_key=True)
-    value:Mapped[str] = mapped_column(Text, nullable=False)
+    key: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str]
 
     @classmethod

@@ -11,6 +11,7 @@ from schemas.sensor import SensorMessage  # ваш класс сообщения
 
 logger = logging.getLogger(__name__)
 
+
 class WebSocketManager:
     def __init__(self, redis_url: str, channel: str = "sensor_updates"):
         self.clients: List[WebSocket] = []
@@ -64,7 +65,6 @@ class WebSocketManager:
                 logger.error(f"Ошибка отправки клиенту: {e}")
                 self.disconnect(client)  # Удаляем неотзывчивого клиента
 
-
     async def startup(self):
         """Запустить фоновый слушатель Redis."""
         self.listener_task = asyncio.create_task(self._listen_redis())
@@ -86,7 +86,4 @@ class WebSocketManager:
             await self.redis_client.close()
 
 
-ws_manager = WebSocketManager(
-            redis_url=settings.redis.url,
-            channel="sensor_updates"
-        )
+ws_manager = WebSocketManager(redis_url=settings.redis.url, channel="sensor_updates")

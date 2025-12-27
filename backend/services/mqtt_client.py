@@ -11,7 +11,6 @@ logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
 
 
-
 class AsyncMQTTClient:
     def __init__(
         self,
@@ -19,7 +18,7 @@ class AsyncMQTTClient:
         port: int = 1883,
         username: str = None,
         password: str = None,
-        client_id: str = None
+        client_id: str = None,
     ):
         self.broker = broker
         self.port = port
@@ -53,7 +52,7 @@ class AsyncMQTTClient:
                     port=self.port,
                     username=self.username,
                     password=self.password,
-                    identifier=self.identifier
+                    identifier=self.identifier,
                 )
 
                 async with self.client:
@@ -82,12 +81,17 @@ class AsyncMQTTClient:
                                 try:
                                     asyncio.create_task(callback(payload))
                                 except Exception as e:
-                                    logger.error(f"Ошибка в callback для {topic}: {e}", exc_info=True)
+                                    logger.error(
+                                        f"Ошибка в callback для {topic}: {e}",
+                                        exc_info=True,
+                                    )
 
             except aiomqtt.MqttError as e:
                 self._is_connected = False
                 logger.warning(f"MQTT соединение потеряно: {e}. Повтор через 5 сек...")
-                await asyncio.sleep(5)  # Только здесь задержка — не влияет на основной цикл
+                await asyncio.sleep(
+                    5
+                )  # Только здесь задержка — не влияет на основной цикл
             except Exception as e:
                 logger.error(f"Неожиданная ошибка MQTT: {e}", exc_info=True)
                 self._is_connected = False
@@ -100,11 +104,7 @@ class AsyncMQTTClient:
                         pass
 
     async def publish(
-        self,
-        topic: str,
-        payload: dict,
-        qos: int = 0,
-        retain: bool = False
+        self, topic: str, payload: dict, qos: int = 0, retain: bool = False
     ) -> bool:
         """Публикует сообщение. Возвращает True при успехе."""
         if not self._is_connected or not self.client:
@@ -156,3 +156,7 @@ class AsyncMQTTClient:
                 pass
         self._is_connected = False
         logger.info("MQTT клиент отключён")
+
+    @property
+    def is_connected(self):
+        return self._is_connected

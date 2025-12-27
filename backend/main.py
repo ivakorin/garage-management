@@ -3,12 +3,13 @@ import logging
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
-from fastapi import FastAPI, HTTPException
-from starlette.middleware.cors import CORSMiddleware
-from starlette.websockets import WebSocket
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 
+from api.api_v1 import router
 from core.settings import settings
-from db.database import init_db, async_session_context  # Добавляем async_session_context
+from db.database import init_db, async_session_context
 from models import *  # noqa
 from services.plugins import load_plugins
 from services.ws_manager import ws_manager
@@ -17,9 +18,9 @@ from tasks.data_collector import DataCollector
 logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
 
-plugins = {}  # Глобальный словарь для хранения плагинов
+plugins = {}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,9 +42,7 @@ async def lifespan(app: FastAPI):
             db=settings.redis.db,
         )
         data_collector = DataCollector(
-            plugins=plugins_list,
-            db_session=active_db_session,
-            redis_client=redis_client
+            plugins=plugins_list, db_session=active_db_session, redis_client=redis_client
         )
         collect_task = asyncio.create_task(data_collector.collect())
         logger.info("DataCollector task created")
@@ -65,53 +64,75 @@ async def lifespan(app: FastAPI):
         logger.info("Application shutdown complete")
 
 
+app = FastAPI(
+    title="Garage Management",
+    description="API с WebSocket‑подключением",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url=None,
+    lifespan=lifespan,
+)
+
+app.include_router(router=router)
 
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    # Добавляем описание WebSocket
+    openapi_schema["paths"]["/api/v1/ws"] = {
+        "get": {
+            "summary": "WebSocket Endpoint",
+            "description": (
+                "Двунаправленный канал через WebSocket.\n\n"
+                "**Методы:**\n"
+                "- Клиент → Сервер: отправка текстовых сообщений\n"
+                "- Сервер → Клиент: трансляция событий\n\n"
+                "**URL:** `ws://{host}/api/v1/ws`\n"
+                "**Пример подключения:**\n"
+                "```javascript\n"
+                "const ws = new WebSocket('ws://localhost:8000/api/v1/ws');\n"
+                "ws.onmessage = (e) => console.log(e.data);\n"
+                "```"
+            ),
+            "operationId": "websocket_endpoint",
+            "parameters": [],
+            "responses": {
+                "101": {"description": "Переключение на WebSocket"},
+                "400": {"description": "Ошибка подключения"},
+            },
+            "tags": ["WebSocket"],
+        }
+    }
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
 
-app.router.lifespan = lifespan
 
-app = FastAPI(lifespan=lifespan)
+app.openapi = custom_openapi
+
+origins = [
+    "http://localhost",
+    "http://localhost:8000",  # Если порт не 80
+    "https://your-domain.com",  # Ваш домен
+    "http://192.168.1.158",  # Ваш IP
+]
+
+allow_all_origins = True
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins if not allow_all_origins else ["*"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    # Явно разрешаем WebSocket
-    allow_origin_regex=".*",  # Если нужны сложные шаблоны
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "*"
+    ],  # Можно сузить до нужных (например, "Content-Type", "Authorization")
+    # Для WebSocket: разрешаем Upgrade и Connection
+    expose_headers=[],
 )
-
-@app.get("/plugins")
-def list_plugins():
-    return {"plugins": list(plugins.keys())}
-
-@app.get("/plugins/{device_id}/status")
-def get_plugin_status(device_id: str):
-    if device_id not in plugins:
-        raise HTTPException(status_code=404, detail="Plugin not found")
-    status = plugins[device_id].get_status()
-    return {"device_id": device_id, "status": status}
-
-@app.post("/plugins/{device_id}/command")
-async def send_command(device_id: str, command: dict):
-    if device_id not in plugins:
-        raise HTTPException(status_code=404, detail="Plugin not found")
-    try:
-        await plugins[device_id].handle_command(command)
-        return {"status": "command sent", "device_id": device_id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await ws_manager.connect(websocket)
-    try:
-        while True:
-            # Можно принимать команды от клиента (если нужно)
-            data = await websocket.receive_text()
-            logger.debug(f"Получено от клиента: {data}")
-    except Exception as e:
-        logger.warning(f"Клиент отключился: {e}")
-    finally:
-        ws_manager.disconnect(websocket)

@@ -1,4 +1,9 @@
 {
-  "hello": "Hello",
-  "welcome": "Welcome to our app!"
+  "websocket": {
+    "connected": "Connected to host",
+    "parsingError": "WebSocket message parsing error",
+    "closed": "WebSocket connection closed",
+    "wsError": "WebSocket error",
+    "notReady": "WebSocket is not connected or is not ready"
+  }
 }

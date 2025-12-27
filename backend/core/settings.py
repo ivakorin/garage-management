@@ -5,8 +5,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Database(BaseSettings):
-    database: str = 'database.db'
-    patch: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "db", database)
+    database: str = "database.db"
+    patch: str = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "db", database
+    )
 
     @property
     def url(self) -> str:
@@ -21,17 +23,24 @@ class Redis(BaseSettings):
 
     @property
     def url(self) -> str:
-        escaped_password = quote(self.password, safe='')
+        escaped_password = quote(self.password, safe="")
         return f"redis://{self.host}:{self.port}/{self.db}"
+
 
 class Log(BaseSettings):
     level: str
+
 
 class MQTT(BaseSettings):
     host: str
     port: int
     username: str
     password: str
+
+
+class API(BaseSettings):
+    version: int = 1
+    prefix: str = f"/api/v{version}"
 
 
 class Settings(BaseSettings):
@@ -45,6 +54,7 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
     )
     database: Database = Database()
+    api: API = API()
     redis: Redis
     log: Log
     mqtt: MQTT

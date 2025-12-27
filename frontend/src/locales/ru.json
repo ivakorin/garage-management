@@ -1,4 +1,9 @@
 {
-  "hello": "Привет",
-  "welcome": "Добро пожаловать в наше приложение!"
+  "websocket": {
+    "connected": "Подключён к хосту",
+    "parsingError": "Ошибка парсинга сообщения WebSocket",
+    "closed": "Соединение с WebSocket закрыто",
+    "wsError": "Ошибка WebSocket",
+    "notReady": "WebSocket не подключён или не готов"
+  }
 }
