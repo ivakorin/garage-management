@@ -29,10 +29,12 @@ class DeviceReadSchema(DeviceBaseSchema):
     timestamp: datetime
 
 
-class DeviceUpdateSchema(DeviceBaseSchema):
-    device_id: Optional[str]
-    name: Optional[str]
-    description: Optional[str]
+class DeviceUpdateSchema(BaseModel):
+    id: int
+    device_id: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
     def model_post_init(self, __context):
         if not any(self.__dict__.values()):

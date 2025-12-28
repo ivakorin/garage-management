@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import {defineEmits, defineProps, onUnmounted, ref} from 'vue'
+import {defineEmits, defineProps, onMounted, onUnmounted, reactive, ref} from 'vue'
 import type {Widget} from '../composables/useDraggableWidgets'
-import FormattedPluginName from "./FormattedPluginName.vue"
+import FormattedPluginName from './FormattedPluginName.vue'
+import {PhPencil} from '@phosphor-icons/vue'
+import EditDevice from '../dialogs/editDevice.vue'
+import {readDeviceAPI} from '../api/devices.ts'
+import type {SensorsType} from '../../types/sensors.ts'
+import {SensorWebSocket} from '../ws/webSocket.ts'
 
 // Пропсы
 interface Props {
   data: Widget
-  index: number // нужен для обновления в родительском массиве
-  editable: boolean // флаг режима редактирования
+  index: number
+  editable: boolean
 }
 
 const props = defineProps<Props>()
@@ -17,24 +22,73 @@ const emit = defineEmits<{
   (e: 'remove', id: string): void
 }>()
 
-// Размер ячейки сетки (в пикселях)
 const GRID_SIZE = 20
-
-// Функция округления значения до ближайшего кратного GRID_SIZE
 const roundToGrid = (value: number): number => {
   return Math.round(value / GRID_SIZE) * GRID_SIZE
 }
 
-// Состояние перетаскивания
 const isDragging = ref(false)
 const offsetX = ref(0)
 const offsetY = ref(0)
-
-// Состояние изменения размера
 const isResizing = ref(false)
-const resizeEdge = ref<'' | 'se' | 'e' | 's'>('') // юго-восточный, восточный, южный
+const resizeEdge = ref<'' | 'se' | 'e' | 's'>('')
 const startWidth = ref(0)
 const startHeight = ref(0)
+const sensorData = ref<{
+  device_id: string,
+  data: Record<string, number>
+  timestamp: string,
+  value: number
+} | null>(null)
+
+sensorData.value = {
+  device_id: '',
+  data: reactive({}),
+  timestamp: '',
+  value: 0
+}
+
+// Состояние компонента
+const contentLoading = ref<boolean>(true)
+const currentItem = ref<SensorsType | null>(null)
+const showModal = ref<boolean>(false)
+
+// Экземпляр WebSocket (объявляем, но не инициализируем сразу)
+let ws: SensorWebSocket | null = null
+
+// Загрузка данных и подключение к WebSocket
+const loadItem = async (): Promise<SensorsType> => {
+  const response = await readDeviceAPI(props.data.device_id)
+  currentItem.value = response
+
+  // Инициализируем WebSocket только после получения device_id
+  ws = new SensorWebSocket('ws://127.0.0.1:8000/api/v1/ws')
+
+  ws.connect()
+
+  // Подписка на обновления сенсора
+  ws.subscribe(response.device_id)
+
+  // Обработчик входящих данных
+  ws.onSensorUpdate(response.device_id, (data) => {
+    sensorData.value = data
+  })
+
+  // Проверка подписок через 3 секунды
+  setTimeout(() => {
+    ws?.getSubscriptions()
+  }, 3000)
+
+  return response
+}
+
+const onUpdate = () => {
+  loadItem()
+}
+
+const editItem = () => {
+  showModal.value = true
+}
 
 // Обработчики drag (только если editable=true)
 const onMousedown = (e: MouseEvent) => {
@@ -52,6 +106,7 @@ const onMousedown = (e: MouseEvent) => {
 const onMousemove = (e: MouseEvent) => {
   if (!isDragging.value || !props.editable) return
 
+
   const newX = roundToGrid(e.clientX - offsetX.value)
   const newY = roundToGrid(e.clientY - offsetY.value)
 
@@ -68,6 +123,7 @@ const onMouseup = () => {
 const onResizeMousedown = (edge: 'se' | 'e' | 's') => {
   if (!props.editable) return
 
+
   isResizing.value = true
   resizeEdge.value = edge
   startWidth.value = props.data.width
@@ -80,6 +136,7 @@ const onResizeMousedown = (edge: 'se' | 'e' | 's') => {
 
 const onResizeMousemove = (e: MouseEvent) => {
   if (!isResizing.value || !props.editable) return
+
 
   let newWidth = startWidth.value
   let newHeight = startHeight.value
@@ -97,11 +154,9 @@ const onResizeMousemove = (e: MouseEvent) => {
       break
   }
 
-  // Округляем размеры до сетки
   newWidth = roundToGrid(newWidth)
   newHeight = roundToGrid(newHeight)
 
-  // Минимум — одна ячейка сетки
   newWidth = Math.max(newWidth, GRID_SIZE)
   newHeight = Math.max(newHeight, GRID_SIZE)
 
@@ -114,9 +169,24 @@ const onResizeMouseup = () => {
   document.removeEventListener('mousemove', onResizeMousemove)
   document.removeEventListener('mouseup', onResizeMouseup)
 }
+// Жизненные циклы
+onMounted(async () => {
+  try {
+    currentItem.value = await loadItem()
+    contentLoading.value = false
+  } catch (error) {
+    console.error('Failed to load item:', error)
+  }
+})
 
-// Очистка событий при уничтожении
 onUnmounted(() => {
+  // Закрываем WebSocket при уничтожении компонента
+  if (ws) {
+    ws.disconnect()
+    ws = null
+  }
+
+  // Очищаем слушатели событий
   document.removeEventListener('mousemove', onMousemove)
   document.removeEventListener('mouseup', onMouseup)
   document.removeEventListener('mousemove', onResizeMousemove)
@@ -129,61 +199,119 @@ const handleRemove = () => {
     emit('remove', props.data.id)
   }
 }
+
 </script>
+
 
 <template>
   <div
       class="widget"
       :class="{ 'editable': editable }"
       :style="{
-        left: data.x + 'px',
-        top: data.y + 'px',
-        width: data.width + 'px',
-        height: data.height + 'px'
-      }"
+      left: data.x + 'px',
+      top: data.y + 'px',
+      width: data.width + 'px',
+      height: data.height + 'px'
+    }"
       @mousedown="onMousedown"
   >
-    <!-- Заголовок и кнопка удаления -->
-    <div class="widget-header">
-      <h4 class="widget-title">
-        <formatted-plugin-name :name="data.name"/>
-      </h4>
-      <button
-          v-if="editable"
-          class="remove-btn"
-          @click="handleRemove"
-      >
-        ×
-      </button>
+    <!-- Загрузчик (Skeleton) при загрузке -->
+    <div v-if="contentLoading" class="skeleton-container">
+      <n-skeleton height="100%" width="100%" :sharp="false"/>
     </div>
 
-    <!-- Контент виджета -->
-    <div class="widget-content">
-      <p><strong>Type:</strong> {{ data.type }}</p>
-      <p><strong>ID:</strong> {{ data.id }}</p>
+    <!-- Основной контент (показываем только если не грузится) -->
+    <div v-else-if="currentItem && !contentLoading" class="widget-content-wrapper">
+      <!-- Заголовок и кнопка удаления -->
+      <div class="widget-header">
+        <h4 class="widget-title">
+          <n-button
+              quaternary
+              v-if="editable"
+              @click="editItem"
+          >
+            <template #icon>
+              <n-icon size="20">
+                <PhPencil/>
+              </n-icon>
+            </template>
+            <strong class="truncate">
+              <formatted-plugin-name :name="currentItem.name"/>
+            </strong>
+          </n-button>
+          <formatted-plugin-name v-else :name="currentItem.name"/>
+        </h4>
+        <button
+            v-if="editable"
+            class="remove-btn"
+            @click="handleRemove"
+        >
+          ×
+        </button>
+      </div>
+
+      <!-- Контент виджета -->
+      <div class="widget-content" v-if="sensorData">
+        <p><strong>Last seen:</strong>
+          {{ new Date(sensorData.timestamp).toLocaleString() }}</p>
+        <n-p>Value: {{ sensorData.value.toFixed() }}</n-p>
+        <n-list>
+          <n-list-item
+              v-for="(value, key) in Object.entries(sensorData.data)"
+              :key="`${key}-${sensorData.timestamp}`"
+          >
+            {{ key }}: {{ value }}
+          </n-list-item>
+        </n-list>
+      </div>
+
+      <!-- Ручки изменения размера (только если editable=true) -->
+      <template v-if="editable">
+        <!-- Юго-восточный угол -->
+        <div
+            class="resize-handle se"
+            @mousedown.prevent="onResizeMousedown('se')"
+        />
+        <!-- Восточный край -->
+        <div
+            class="resize-handle e"
+            @mousedown.prevent="onResizeMousedown('e')"
+        />
+        <!-- Южный край -->
+        <div
+            class="resize-handle s"
+            @mousedown.prevent="onResizeMousedown('s')"
+        />
+      </template>
     </div>
 
-    <!-- Ручки изменения размера (только если editable=true) -->
-    <template v-if="editable">
-      <!-- Юго-восточный угол -->
-      <div
-          class="resize-handle se"
-          @mousedown.prevent="onResizeMousedown('se')"
-      />
-      <!-- Восточный край -->
-      <div
-          class="resize-handle e"
-          @mousedown.prevent="onResizeMousedown('e')"
-      />
-      <!-- Южный край -->
-      <div
-          class="resize-handle s"
-          @mousedown.prevent="onResizeMousedown('s')"
-      />
-    </template>
+    <!-- Модальное окно редактирования -->
+    <edit-device
+        v-if="currentItem"
+        v-model:show="showModal"
+        :initial-data="currentItem"
+        @update="onUpdate"
+        @close="showModal = false"
+    />
   </div>
 </template>
+
 <style scoped>
+.sensor-item {
+  font-size: xx-small;
+}
+
+.sensor-key {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-right: 8px;
+}
+
+.sensor-value {
+  color: #16a085;
+  font-family: monospace;
+}
+
 .widget {
   position: absolute;
   background-color: #ffffff;
@@ -302,5 +430,37 @@ const handleRemove = () => {
 .widget.editable {
   filter: brightness(0.98);
 }
+
+/* Контейнер для скелетона */
+.skeleton-overlay {
+  position: absolute;
+  inset: 0; /* покрывает весь виджет */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.8); /* полупрозрачный белый фон */
+  backdrop-filter: blur(2px); /* лёгкий размыв фона */
+  z-index: 1;
+  border-radius: inherit; /* наследуем радиус углов от .widget */
+}
+
+/* Плавное появление/скрытие скелетона */
+.skeleton-overlay,
+.widget-content-wrapper {
+  transition: opacity 0.3s ease;
+}
+
+/* При загрузке — скелетон виден, контент скрыт */
+.widget[contentLoading="true"] .widget-content-wrapper {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Когда не загружается — скелетон скрыт, контент виден */
+.widget:not([contentLoading="true"]) .skeleton-overlay {
+  opacity: 0;
+  pointer-events: none;
+}
 </style>
+
 

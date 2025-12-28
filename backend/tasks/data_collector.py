@@ -176,12 +176,14 @@ class DataCollector:
             # Проверяем подключение (ping)
             await self.redis_client.ping()
             await self.redis_client.publish("sensor_updates", message.model_dump_json())
-            logger.debug(f"Отправлено в Redis: sensor_updates → {message.device_id}")
+            logger.info(f"Sent to Redis: sensor_updates → {message.device_id}")
         except (redis.ConnectionError, redis.TimeoutError) as e:
-            logger.error(f"Ошибка подключения к Redis: {e}. Будет повторная попытка.")
+            logger.error(
+                f"Error connecting to Redis: {e}. There will be a second attempt."
+            )
             # Можно добавить retry с задержкой
         except Exception as e:
-            logger.error(f"Неожиданная ошибка Redis: {e}")
+            logger.error(f"Unexpected Redis error: {e}")
 
     async def _publish_to_mqtt(self, message: SensorMessage):
         """Публикация в MQTT с автоматической переподключкой при потере соединения."""

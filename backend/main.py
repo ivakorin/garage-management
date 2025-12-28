@@ -14,6 +14,7 @@ from models import *  # noqa
 from services.plugins import load_plugins
 from services.ws_manager import ws_manager
 from tasks.data_collector import DataCollector
+from utils.automations import automations_loader
 
 logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ async def lifespan(app: FastAPI):
         )
         collect_task = asyncio.create_task(data_collector.collect())
         logger.info("DataCollector task created")
+        await automations_loader("./automations")
         yield
 
     except Exception as e:
@@ -73,7 +75,30 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(router=router)
+origins = [
+    "http://localhost",
+    "http://localhost:8000",  # Если порт не 80
+    "https://your-domain.com",  # Ваш домен
+    "http://192.168.1.158",  # Ваш IP
+]
+
+allow_all_origins = True
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins if not allow_all_origins else ["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "*",
+        "Upgrade",
+        "Connection",
+        "Sec-WebSocket-Key",
+        "Sec-WebSocket-Version",
+        "Sec-WebSocket-Protocol",
+    ],
+    expose_headers=[],
+)
 
 
 def custom_openapi():
@@ -116,23 +141,4 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-origins = [
-    "http://localhost",
-    "http://localhost:8000",  # Если порт не 80
-    "https://your-domain.com",  # Ваш домен
-    "http://192.168.1.158",  # Ваш IP
-]
-
-allow_all_origins = True
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins if not allow_all_origins else ["*"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=[
-        "*"
-    ],  # Можно сузить до нужных (например, "Content-Type", "Authorization")
-    # Для WebSocket: разрешаем Upgrade и Connection
-    expose_headers=[],
-)
+app.include_router(router=router)

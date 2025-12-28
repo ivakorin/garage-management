@@ -1,6 +1,20 @@
 import {api} from "../boot/axios.ts";
+import type {UpdateSensorType} from "../../types/sensors.ts";
 
-export const fetchDevicesAPI = async () => {
-    const response = await api.get('sensors/get')
+const fetchDevicesAPI = async () => {
+    const response = await api.get('sensors/get/all')
     return response.data
 }
+
+
+const updateDeviceAPI = async (params: UpdateSensorType) => {
+    const response = await api.patch('sensors/update', params)
+    return response.data
+}
+
+const readDeviceAPI = async (device_id: string) => {
+    const response = await api.get(`sensors/get/${device_id}`)
+    return response.data
+}
+
+export {updateDeviceAPI, fetchDevicesAPI, readDeviceAPI}

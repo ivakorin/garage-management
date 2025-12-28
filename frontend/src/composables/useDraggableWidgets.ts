@@ -2,14 +2,16 @@ import {ref} from 'vue'
 import {fetchLayoutAPI, saveLayoutAPI} from '../api/dashboard'
 
 export interface Widget {
-    id: string
+    id: number
+    device_id: string
     type: 'plugin' | 'device'
     name: string
-    x: number
-    y: number
-    width: number
-    height: number
-    data: Record<string, any>
+    description?: string
+    x?: number
+    y?: number
+    width?: number
+    height?: number
+    data?: Record<string, any>
 }
 
 export function useDraggableWidgets() {
@@ -39,7 +41,7 @@ export function useDraggableWidgets() {
     }
 
     // Remove widget
-    const removeWidget = (id: string) => {
+    const removeWidget = (id: number) => {
         widgets.value = widgets.value.filter(w => w.id !== id)
     }
 

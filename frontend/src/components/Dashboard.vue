@@ -17,7 +17,7 @@ import DeviceList from "./DeviceList.vue";
 
 // Режимы
 const isEditing = ref(false)
-const isSiderVisible = ref(true) // по умолчанию сайдбар виден
+const isSiderVisible = ref(false)
 const activeTab = ref('devices')
 
 // Виджеты
@@ -125,7 +125,7 @@ onMounted(() => {
           <plugin-list @add-widget="addWidget" :is-editing="isEditing"/>
         </n-tab-pane>
         <n-tab-pane name="devices" tab="Devices">
-          <device-list @add-widget="addWidget"/>
+          <device-list @add-widget="addWidget" :is-editing="isEditing"/>
         </n-tab-pane>
       </n-tabs>
 

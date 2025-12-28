@@ -36,7 +36,7 @@ class DS18B20MuxPlugin(DevicePlugin):
         logger.info("Виртуальное железо готово")
 
     async def read_data(self) -> Dict[str, Any]:
-        data = {}
+        data = {"unit": "celsius"}
         for sensor_id in range(self.num_sensors):
             if self.sensor_states[sensor_id]["online"]:
                 temp = self.base_temp + random.uniform(

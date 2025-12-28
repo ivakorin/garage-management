@@ -4,11 +4,11 @@ import logging
 from typing import Optional, List
 
 from fastapi import HTTPException
-from sqlalchemy import delete, select, and_, func
+from sqlalchemy import delete, select, and_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import DeviceData, SystemSetting, Device
-from schemas.sensor import DeviceReadSchema
+from schemas.sensor import DeviceReadSchema, DeviceUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,28 @@ class DeviceDataCRUD:
         session.add(db_data)
         await session.flush()  # Чтобы получить ID до commit
         return db_data
+
+    @staticmethod
+    async def update(data: DeviceUpdateSchema, session: AsyncSession) -> DeviceReadSchema:
+        try:
+            update_stmt = (
+                update(Device)
+                .where(Device.device_id == data.device_id)
+                .values(
+                    data.model_dump(
+                        exclude_defaults=True, exclude_none=True, exclude_unset=True
+                    )
+                )
+            )
+            await session.execute(update_stmt)
+            await session.commit()
+
+            return await DeviceDataCRUD.get(data.device_id, session)
+
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error updating device {data.device_id}: {e}")
+            raise HTTPException(status_code=400, detail="Failed to update device") from e
 
     @staticmethod
     async def get_retention_days(session: AsyncSession) -> int:
@@ -52,7 +74,6 @@ class DeviceDataCRUD:
 
     @staticmethod
     async def get_all(session: AsyncSession) -> List[DeviceReadSchema]:
-        # 1. Находим последнюю запись DeviceData для каждого device_id
         subq = (
             select(
                 DeviceData.device_id,
@@ -61,8 +82,6 @@ class DeviceDataCRUD:
             .group_by(DeviceData.device_id)
             .subquery()
         )
-
-        # 2. Соединяем Device с последней записью DeviceData
         stmt = (
             select(Device, DeviceData)
             .join(
@@ -100,3 +119,40 @@ class DeviceDataCRUD:
             await session.rollback()
             logger.error(f"Error fetching devices with latest data: {e}")
             raise HTTPException(status_code=400, detail="No data found") from e
+
+    @staticmethod
+    async def get(device_id: str, session: AsyncSession) -> DeviceReadSchema:
+        subq = (
+            select(
+                DeviceData.device_id,
+                func.max(DeviceData.timestamp).label("max_timestamp"),
+            )
+            .group_by(DeviceData.device_id)
+            .subquery()
+        )
+
+        stmt = (
+            select(Device, DeviceData)
+            .join(
+                DeviceData,
+                and_(
+                    Device.device_id == DeviceData.device_id,
+                    DeviceData.timestamp == subq.c.max_timestamp,
+                ),
+            )
+            .outerjoin(subq, DeviceData.device_id == subq.c.device_id)
+            .where(Device.device_id == device_id)
+            .order_by(Device.created_at.desc())
+        )
+
+        result = await session.execute(stmt)
+        row = result.first()
+
+        if not row:
+            await session.rollback()
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        device, device_data = row
+        device_dict = device.__dict__.copy()
+        device_dict["timestamp"] = device_data.timestamp if device_data else None
+        return DeviceReadSchema.model_validate(device_dict, from_attributes=True)

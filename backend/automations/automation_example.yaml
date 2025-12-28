@@ -1,0 +1,12 @@
+automation:
+  id: door-sensor-alert
+  name: "Оповещение при открытии двери"
+  trigger:
+    type: sensor_change
+    sensor_id: garage_door
+    condition: open
+  action:
+    type: send_notification
+    recipient: admin@example.com
+    message: "Дверь гаража открыта!"
+  enabled: true

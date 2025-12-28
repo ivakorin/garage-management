@@ -31,13 +31,3 @@ class LeakSensorPlugin(DevicePlugin):
     async def handle_command(self, command: dict) -> dict:
         """Обработка команд."""
         return {"status": "unsupported", "command": command}
-
-    # async def start(self):
-    #     """Асинхронный генератор данных."""
-    #     while True:
-    #         data = await self.read_data()
-    #         message = SensorMessage(
-    #             device_id=self.device_id, timestamp=datetime.now().isoformat(), data=data
-    #         )
-    #         yield message
-    #         await asyncio.sleep(5)  # Каждые 5 секунд
