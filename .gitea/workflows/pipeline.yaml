@@ -23,7 +23,7 @@ jobs:
 
       # 2. Собираем образ
       - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKER_IMAGE }} -f services/docker/backend.Dockerfile .
+        run: docker build -t ${{ secrets.DOCKER_IMAGE }} -f services/docker/backend.Dockerfile . --progress=plain
 
 
       # 3. Публикуем образ
