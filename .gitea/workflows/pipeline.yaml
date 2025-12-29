@@ -11,14 +11,8 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
-      #      - name: Debug Check current directory
-      #        run: |
-      #          pwd
-      #          ls -la
-      #          ls -la services/docker/
       - name: Checkout repository
         uses: actions/checkout@v3
-      # 1. Логинимся в реестр GitFlic
       - name: Docker Login
         env:
           DOCKER_PASSWORD: ${{ secrets.GITFLIC_TOKEN }}
@@ -26,18 +20,9 @@ jobs:
           echo "$DOCKER_PASSWORD" | docker login registry.gitflic.ru \
             -u "${{ secrets.GITFLIC_USER }}" \
             --password-stdin
-
-
-      # 2. Собираем образ
       - name: Build Docker Image
         run: docker build -t ${{ secrets.DOCKER_IMAGE }} -f services/docker/backend.Dockerfile . --progress=plain
-
-
-      # 3. Публикуем образ
       - name: Push to Registry
         run: docker push ${{ secrets.DOCKER_IMAGE }}
-
-
-      # 4. Выход из реестра
       - name: Docker Logout
         run: docker logout registry.gitflic.ru
