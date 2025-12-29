@@ -20,6 +20,7 @@ async def load_plugins(db_session: AsyncSession) -> dict:
 
     for filename in os.listdir(plugins_dir):
         if filename.endswith(".py") and filename not in ("__init__.py", "template.py"):
+            prefix = filename.split("_")[0]
             module_name = f"plugins.{filename[:-3]}"
             try:
                 module = importlib.import_module(module_name)
@@ -49,7 +50,8 @@ async def load_plugins(db_session: AsyncSession) -> dict:
                             if not await Plugins.is_running(device_id):
                                 continue
                         else:
-                            device_id = f"{filename[:-3]}_{uuid.uuid4().hex[:8]}"
+                            uid = uuid.uuid4().hex[:12]
+                            device_id = f"{prefix}_{uid}"
                             registry = PluginRegistry(
                                 module_name=module_name,
                                 class_name=attr,

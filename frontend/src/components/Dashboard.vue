@@ -104,7 +104,13 @@ onMounted(() => {
           </n-button>
         </div>
         <div class="logo">
-          <h1>Garage Management</h1>
+          <n-space>
+            <n-image
+                width="30"
+                src="/icon_path.svg"
+            />
+            <h1>Garage Management</h1>
+          </n-space>
         </div>
       </div>
     </n-layout-header>
