@@ -36,23 +36,40 @@ const removeWidget = (id: string | number) => {
 
 const updateWidgetPosition = (update: { index: number; x: number; y: number }) => {
   if (!isEditing.value) return
-  widgets.value[update.index].x = update.x
-  widgets.value[update.index].y = update.y
+  if (update.index < 0 || update.index >= widgets.value.length) {
+    console.warn(`Widget index ${update.index} is out of bounds`)
+    return
+  }
+  const widget = widgets.value[update.index]
+  if (!widget) {
+    console.error(`Widget at index ${update.index} not found`)
+    return
+  }
+  widget.x = update.x
+  widget.y = update.y
 }
 
 const updateWidgetSize = (update: { index: number; width: number; height: number }) => {
   if (!isEditing.value) return
-  widgets.value[update.index].width = update.width
-  widgets.value[update.index].height = update.height
-}
 
-// Переключение режимов
+  if (update.index < 0 || update.index >= widgets.value.length) {
+    console.warn(`Widget index ${update.index} is out of bounds`)
+    return
+  }
+
+  const widget = widgets.value[update.index]
+  if (!widget) {
+    console.error(`Widget at index ${update.index} not found`)
+    return
+  }
+
+  widget.width = update.width
+  widget.height = update.height
+}
 const toggleEditMode = () => {
   isEditing.value = !isEditing.value
   if (!isEditing.value) saveLayout()
 }
-
-// Переключение видимости сайдбара
 const toggleSiderVisibility = () => {
   isSiderVisible.value = !isSiderVisible.value
 }

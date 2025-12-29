@@ -20,9 +20,13 @@ jobs:
           echo "$DOCKER_PASSWORD" | docker login registry.gitflic.ru \
             -u "${{ secrets.GITFLIC_USER }}" \
             --password-stdin
-      - name: Build Docker Image
+      - name: Build Backend Docker Image
         run: docker build -t ${{ secrets.DOCKER_IMAGE }} -f services/docker/backend.Dockerfile . --progress=plain
-      - name: Push to Registry
+      - name: Push Backend to Registry
         run: docker push ${{ secrets.DOCKER_IMAGE }}
+      - name: Build Frontend Docker Image
+        run: docker build -t ${{ secrets.DOCKER_IMAGE_FRONTEND }} -f services/docker/frontend.Dockerfile . --progress=plain
+      - name: Push Frontend to Registry
+        run: docker push ${{ secrets.DOCKER_IMAGE_FRONTEND }}
       - name: Docker Logout
         run: docker logout registry.gitflic.ru

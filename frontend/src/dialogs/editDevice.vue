@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {defineEmits, defineProps, ref, watch} from 'vue'
+import {ref, watch} from 'vue'
 import {NButton, NCard, NForm, NFormItem, NInput, NModal, useMessage} from 'naive-ui'
 import type {SensorsType} from "../../types/sensors.ts";
 import {updateDeviceAPI} from "../api/devices.ts";

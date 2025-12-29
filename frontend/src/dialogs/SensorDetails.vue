@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {defineProps, ref, watch} from 'vue'
+import {ref, watch} from 'vue'
 
 interface SensorData {
   device_id: string
@@ -79,7 +79,7 @@ const emit = defineEmits<{
               :key="`${key}-${sensorData?.timestamp}`"
           >
             <template #prefix>{{ key }}:</template>
-            {{ Number.isFinite(value) ? value.toFixed(2) : value }}
+            {{ Number.isFinite(value[1]) ? value[1].toFixed(2) : value[1] }}
           </n-list-item>
         </n-list>
       </n-card>

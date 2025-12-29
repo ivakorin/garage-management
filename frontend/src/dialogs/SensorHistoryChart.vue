@@ -85,20 +85,26 @@ function groupByHour(
     grouped.get(key)!.timestamps.push(item.timestamp)
   })
 
-  return Array.from(grouped.entries()).map(([key, {values, timestamps}]) => {
-    let aggregatedValue: number
+  return Array.from(grouped.entries()).map(([key, {values}]) => {
+    let aggregatedValue: number;
+
     if (isBoolean) {
-      // Для boolean: берём последнее значение за час
-      aggregatedValue = values[values.length - 1]
+      if (values.length === 0) {
+        console.warn(`Empty values array for key: ${key}`);
+        aggregatedValue = 0;
+      } else {
+        aggregatedValue = values[values.length - 1]!; // ! — утверждение: не undefined
+      }
     } else {
-      // Для числовых: среднее
-      aggregatedValue = values.reduce((a, b) => a + b, 0) / values.length
+      aggregatedValue = values.reduce((a, b) => a + b, 0) / values.length;
     }
+
     return {
       timestamp: new Date(`${key}:00:00.000Z`),
       value: aggregatedValue
-    }
-  })
+    };
+  });
+
 }
 
 function groupByMinute(data: { timestamp: Date; value: number }[]): {
@@ -181,7 +187,6 @@ function updateChartOption() {
           type: 'line',
           data: processedData.map(d => [d.timestamp, d.value]),
           lineStyle: {width: 2},
-          itemStyle: {symbol: 'circle', symbolSize: 6},
           smooth: true
         }
       ],

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {defineEmits, defineProps, onMounted, onUnmounted, ref} from 'vue'
+import {onMounted, onUnmounted, ref} from 'vue'
 import type {Widget} from '../composables/useDraggableWidgets'
 import FormattedPluginName from './FormattedPluginName.vue'
 import {PhPencil} from '@phosphor-icons/vue'
@@ -19,7 +19,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'update-position', update: { index: number; x: number; y: number }): void
   (e: 'update-size', update: { index: number; width: number; height: number }): void
-  (e: 'remove', id: string): void
+  (e: 'remove', id: number): void
 }>()
 
 const GRID_SIZE = 20

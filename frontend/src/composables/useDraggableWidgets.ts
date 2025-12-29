@@ -7,10 +7,10 @@ export interface Widget {
     type: 'plugin' | 'device'
     name: string
     description?: string
-    x?: number
-    y?: number
-    width?: number
-    height?: number
+    x: number
+    y: number
+    width: number
+    height: number
     data?: Record<string, any>
 }
 

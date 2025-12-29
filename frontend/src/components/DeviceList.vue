@@ -34,7 +34,11 @@ const addToDashboard = (device: SensorsType) => {
     device_id: device.device_id,
     type: "device",
     name: device.name,
-    description: device.description
+    description: device.description,
+    x: 0,
+    y: 0,
+    width: 200,
+    height: 200
   }
   emit('add-widget', widget)
 }

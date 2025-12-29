@@ -22,17 +22,16 @@ const emit = defineEmits<{
 }>()
 const addToDashboard = (plugin: PluginsType) => {
   const widget: Widget = {
-    id: plugin.id.toString(),
+    id: plugin.id,
+    device_id: plugin.device_id,
     type: 'plugin',
-    name: plugin.class_name
+    name: plugin.class_name,
+    x: 0,
+    y: 0,
+    height: 200,
+    width: 200
   }
   emit('add-widget', widget)
-}
-const removePluginById = (id: string | number) => {
-  const index = plugins.value.findIndex(plugin => plugin.id === id)
-  if (index !== -1) {
-    plugins.value.splice(index, 1)
-  }
 }
 
 const updatePlugin = (id: number, is_running: boolean) => {
