@@ -2,7 +2,7 @@ stages:
   - build-and-publish
 
 variables:
-  DOCKER_IMAGE: registry.gitflic.ru/project/ваш_ник/ваш_проект/garage-management
+  DOCKER_IMAGE: registry.gitflic.ru/project/ivakorin/garage-management
   DOCKERFILE_PATH: services/docker/backend.Dockerfile
 
 build-and-publish:
