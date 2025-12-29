@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.settings import settings
+from crud.sensor import DeviceDataCRUD
 from models import DeviceData, Device
 from plugins.template import DevicePlugin
 from schemas.sensor import SensorMessage
@@ -130,17 +131,22 @@ class DataCollector:
             last_data = last_data_result.scalars().first()
 
             if self._is_data_changed(last_data, message.data):
-                numeric_value = self._extract_numeric_value(message.data)
+                await DeviceDataCRUD.cleanup_old_data(
+                    session=self.db_session,
+                    device_id=message.device_id,
+                    retention_days=settings.app_settings.keep_data,
+                )
+                message.value = self._extract_numeric_value(message.data)
                 db_data = DeviceData(
                     device_id=message.device_id,
                     timestamp=datetime.fromisoformat(message.timestamp),
                     data=json.dumps(message.data),
-                    value=numeric_value,
+                    value=message.value,
+                    unit=message.unit,
                 )
                 self.db_session.add(db_data)
                 await self.db_session.commit()
                 logger.info(f"Данные сохранены для устройства {message.device_id}")
-                message.value = numeric_value
                 # 1. Пытаемся отправить в Redis
                 await self._publish_to_redis(message)
                 # 1. Пытаемся отправить в MQTT

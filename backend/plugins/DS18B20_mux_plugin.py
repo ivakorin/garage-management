@@ -1,5 +1,6 @@
 import logging
 import random
+import time
 from typing import Dict, Any
 
 from .template import DevicePlugin
@@ -37,16 +38,42 @@ class DS18B20MuxPlugin(DevicePlugin):
 
     async def read_data(self) -> Dict[str, Any]:
         data = {"unit": "celsius"}
+
         for sensor_id in range(self.num_sensors):
             if self.sensor_states[sensor_id]["online"]:
-                temp = self.base_temp + random.uniform(
-                    self.base_temp, self.temp_variation
-                )
+                # Получаем текущее время для расчёта динамики
+                now = time.time()
+
+                # Если последнее обновление было недавно — используем плавное изменение
+                if (now - self.sensor_states[sensor_id].get("last_update", 0)) < 60:
+                    # Плавное колебание ±0.2°C от последнего значения
+                    temp_change = random.uniform(-0.2, 0.2)
+                    temp = self.sensor_states[sensor_id]["last_temp"] + temp_change
+                else:
+                    # Раз в 1–3 минуты имитируем небольшое изменение из-за внешних факторов
+                    temp_change = random.uniform(-0.5, 1.0)
+                    temp = self.base_temp + temp_change
+
+                    # Имитируем влияние бытовых факторов (плита, солнце, проветривание)
+                    if random.random() < 0.15:  # 15% вероятность локального влияния
+                        temp += random.uniform(0.3, 1.5)
+                    elif random.random() < 0.1:  # 10% вероятность охлаждения
+                        temp -= random.uniform(0.2, 0.8)
+
+                # Ограничиваем реалистичный диапазон для квартиры
+                temp = max(18.0, min(30.0, temp))
+
+                # Округляем до 1 знака после запятой
                 temp = round(temp, 1)
+
+                # Сохраняем значение и время обновления
                 self.sensor_states[sensor_id]["last_temp"] = temp
+                self.sensor_states[sensor_id]["last_update"] = now
+
                 data[f"sensor_{sensor_id}"] = temp
             else:
                 data[f"sensor_{sensor_id}"] = None
+
         return data
 
     async def handle_command(self, command: dict):

@@ -9,7 +9,7 @@ class SensorMessage(BaseModel):
     timestamp: str
     data: Dict[str, Any]
     value: Optional[float] = None
-    unit: Optional[str] = None
+    unit: str
 
 
 class DeviceBaseSchema(BaseModel):
@@ -40,3 +40,10 @@ class DeviceUpdateSchema(BaseModel):
     def model_post_init(self, __context):
         if not any(self.__dict__.values()):
             raise ValueError("At least one field must be provided for update")
+
+
+class DeviceDataReadSchema(BaseModel):
+    device_id: str
+    timestamp: datetime
+    value: Optional[float] = None
+    unit: Optional[str] = None

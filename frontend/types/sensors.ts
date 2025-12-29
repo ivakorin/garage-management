@@ -7,6 +7,7 @@ type SensorsType = {
     updated_at: string
     timestamp: string
     type: "sensors"
+    unit: string
 }
 
 type UpdateSensorType = {
@@ -16,4 +17,12 @@ type UpdateSensorType = {
     "id": number,
 }
 
-export type {SensorsType, UpdateSensorType}
+type SensorDataReadType = {
+    device_id: string
+    data: Record<string, number>
+    timestamp: string
+    value: number
+    unit: string
+}
+
+export type {SensorsType, UpdateSensorType, SensorDataReadType}

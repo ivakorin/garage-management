@@ -29,8 +29,7 @@ class LeakSensorPlugin(DevicePlugin):
         return {
             "leak": data,
             "alert": leak,
-            "boolean": True,
-            "unit": "",
+            "unit": "boolean",
             "message": "Протечка!" if leak else "Всё сухо",
         }
 

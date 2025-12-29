@@ -1,5 +1,4 @@
 import os
-from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,7 +22,6 @@ class Redis(BaseSettings):
 
     @property
     def url(self) -> str:
-        escaped_password = quote(self.password, safe="")
         return f"redis://{self.host}:{self.port}/{self.db}"
 
 
@@ -42,6 +40,9 @@ class API(BaseSettings):
     version: int = 1
     prefix: str = f"/api/v{version}"
 
+class AppSettings(BaseSettings):
+    keep_data: int = 7
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -58,6 +59,7 @@ class Settings(BaseSettings):
     redis: Redis
     log: Log
     mqtt: MQTT
+    app_settings: AppSettings
 
 
 settings = Settings()

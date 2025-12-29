@@ -5,8 +5,9 @@ import FormattedPluginName from './FormattedPluginName.vue'
 import {PhPencil} from '@phosphor-icons/vue'
 import EditDevice from '../dialogs/editDevice.vue'
 import {readDeviceAPI} from '../api/devices.ts'
-import type {SensorsType} from '../../types/sensors.ts'
+import type {SensorDataReadType, SensorsType} from '../../types/sensors.ts'
 import {SensorWebSocket} from '../ws/webSocket.ts'
+import SensorHistoryChart from "../dialogs/SensorHistoryChart.vue";
 
 interface Props {
   data: Widget
@@ -34,18 +35,13 @@ const resizeEdge = ref<'' | 'se' | 'e' | 's'>('')
 const startWidth = ref(0)
 const startHeight = ref(0)
 
-const sensorData = ref<{
-  device_id: string
-  data: Record<string, number>
-  timestamp: string
-  value: number
-  unit: string
-} | null>(null)
+const sensorData = ref<SensorDataReadType | null>(null)
 
 const contentLoading = ref<boolean>(true)
 const currentItem = ref<SensorsType | null>(null)
 const showModal = ref<boolean>(false)
-const showDetails = ref<boolean>(false) // Управление всплывающим окном
+const showDetails = ref<boolean>(false)
+const showHistory = ref<boolean>(false)
 
 let ws: SensorWebSocket | null = null
 
@@ -148,6 +144,10 @@ const onResizeMouseup = () => {
   document.removeEventListener('mouseup', onResizeMouseup)
 }
 
+const openHistory = () => {
+  showHistory.value = true
+}
+
 onMounted(async () => {
   try {
     currentItem.value = await loadItem()
@@ -227,6 +227,7 @@ onUnmounted(() => {
           <n-button
               type="primary"
               size="tiny"
+              @click="openHistory"
           >
             History
           </n-button>
@@ -275,6 +276,13 @@ onUnmounted(() => {
             <n-button @click="showDetails = false">Close</n-button>
           </div>
         </n-modal>
+        <sensor-history-chart
+            :device-id="currentItem?.device_id || ''"
+            v-model="showHistory"
+            :device-name="currentItem?.name || ''"
+            :sensor-value="sensorData"
+            @close="showHistory = false"
+        />
       </div>
       <template v-if="editable">
         <div

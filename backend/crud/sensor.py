@@ -1,32 +1,18 @@
 import datetime
-import json
 import logging
-from typing import Optional, List
+from typing import List
 
 from fastapi import HTTPException
 from sqlalchemy import delete, select, and_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import DeviceData, SystemSetting, Device
-from schemas.sensor import DeviceReadSchema, DeviceUpdateSchema
+from models import DeviceData, Device
+from schemas.sensor import DeviceReadSchema, DeviceUpdateSchema, DeviceDataReadSchema
 
 logger = logging.getLogger(__name__)
 
 
 class DeviceDataCRUD:
-    @staticmethod
-    async def create(
-        session: AsyncSession, device_id: str, data: dict, value: Optional[float] = None
-    ) -> DeviceData:
-        db_data = DeviceData(
-            device_id=device_id,
-            timestamp=datetime.datetime.now(),
-            data=json.dumps(data),
-            value=value,
-        )
-        session.add(db_data)
-        await session.flush()  # Чтобы получить ID до commit
-        return db_data
 
     @staticmethod
     async def update(data: DeviceUpdateSchema, session: AsyncSession) -> DeviceReadSchema:
@@ -51,22 +37,10 @@ class DeviceDataCRUD:
             raise HTTPException(status_code=400, detail="Failed to update device") from e
 
     @staticmethod
-    async def get_retention_days(session: AsyncSession) -> int:
-        result = await session.execute(
-            select(SystemSetting).where(SystemSetting.key == "data_retention_days")
-        )
-        setting = result.scalars().first()
-        if setting:
-            return max(1, int(setting.value))
-        return 7  # По умолчанию 7 дней
-
-    @staticmethod
     async def cleanup_old_data(
         session: AsyncSession, device_id: str, retention_days: int
     ):
-        cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
-            days=retention_days
-        )
+        cutoff = datetime.datetime.now() - datetime.timedelta(days=retention_days)
         stmt = delete(DeviceData).where(
             DeviceData.device_id == device_id, DeviceData.timestamp < cutoff
         )
@@ -156,3 +130,43 @@ class DeviceDataCRUD:
         device_dict = device.__dict__.copy()
         device_dict["timestamp"] = device_data.timestamp if device_data else None
         return DeviceReadSchema.model_validate(device_dict, from_attributes=True)
+
+    @staticmethod
+    async def get_history(
+        session: AsyncSession,
+        device_id: str,
+    ) -> List[DeviceDataReadSchema]:
+        stmt = (
+            select(
+                DeviceData.device_id,
+                DeviceData.timestamp,
+                DeviceData.value,
+                DeviceData.unit,
+            )
+            .where(DeviceData.device_id == device_id)
+            .order_by(DeviceData.timestamp.desc())
+        )
+        try:
+            result = await session.execute(stmt)
+            rows = result.all()  # Возвращает список кортежей
+
+            if not rows:
+                return []
+
+            validated_data = []
+            for row in rows:
+                # row — это кортеж (device_id, timestamp, value, unit)
+                schema = DeviceDataReadSchema(
+                    device_id=row[0],
+                    timestamp=row[1],
+                    value=row[2],
+                    unit=row[3],
+                )
+                validated_data.append(schema)
+
+            return validated_data
+
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error fetching history: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error") from e

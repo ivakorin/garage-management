@@ -87,6 +87,20 @@ class SensorWebSocket {
         this.messageHandlers.set(sensorId, callback);
     }
 
+    // НОВЫЙ МЕТОД: отмена подписки на обновления датчика
+    offSensorUpdate(sensorId: string, callback?: (data: any) => void): void {
+        if (callback) {
+            // Если передан callback, проверяем, что он совпадает с сохранённым
+            const existingCallback = this.messageHandlers.get(sensorId);
+            if (existingCallback === callback) {
+                this.messageHandlers.delete(sensorId);
+            }
+        } else {
+            // Если callback не передан, просто удаляем обработчик для sensorId
+            this.messageHandlers.delete(sensorId);
+        }
+    }
+
     private _handleMessage(data: any): void {
         if (data.status) {
             return;
@@ -129,5 +143,4 @@ class SensorWebSocket {
     }
 }
 
-
-export {SensorWebSocket}
+export {SensorWebSocket};

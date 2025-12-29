@@ -17,4 +17,10 @@ const readDeviceAPI = async (device_id: string) => {
     return response.data
 }
 
-export {updateDeviceAPI, fetchDevicesAPI, readDeviceAPI}
+
+const fetchSensorHistoryAPI = async (device_id: string) => {
+    const response = await api.get(`sensors/get/history/${device_id}`)
+    return response.data
+}
+
+export {updateDeviceAPI, fetchDevicesAPI, readDeviceAPI, fetchSensorHistoryAPI}
