@@ -34,7 +34,7 @@ class DS18B20MuxPlugin(DevicePlugin):
         )
         for i in range(self.num_sensors):
             self.sensor_states[i] = {"online": True, "last_temp": self.base_temp}
-        logger.info("Виртуальное железо готово")
+        logger.info("Virtual hardware is ready")
 
     async def read_data(self) -> Dict[str, Any]:
         data = {"unit": "celsius"}
@@ -82,16 +82,18 @@ class DS18B20MuxPlugin(DevicePlugin):
             sensor = command.get("sensor")
             if sensor in self.sensor_states:
                 self.sensor_states[sensor]["online"] = False
-                logger.info(f"Датчик {sensor} переведён в offline")
+                logger.info(f"Sensor {sensor} switched offline")
         elif action == "set_online":
             sensor = command.get("sensor")
             if sensor in self.sensor_states:
                 self.sensor_states[sensor]["online"] = True
-                logger.info(f"Датчик {sensor} переведён в online")
+                logger.info(f"Sensor {sensor} has been transferred online")
         elif action == "set_base_temp":
             new_temp = command.get("temp")
             if isinstance(new_temp, (int, float)):
                 self.base_temp = float(new_temp)
-                logger.info(f"Базовая температура изменена на {self.base_temp}°C")
+                logger.info(
+                    f"The base temperature has been changed to {self.base_temp}°C"
+                )
         else:
-            logger.warning(f"Неизвестная команда: {command}")
+            logger.warning(f"Unknown command: {command}")

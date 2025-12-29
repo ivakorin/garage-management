@@ -39,7 +39,7 @@ class WebSocketManager:
             pubsub = self.redis_client.pubsub()
             await pubsub.subscribe(self.channel)
 
-            logger.info(f"Подписан на Redis-канал: {self.channel}")
+            logger.info(f"Subscribed to Redis channel: {self.channel}")
 
             while True:
                 message = await pubsub.get_message(ignore_subscribe_messages=True)
@@ -49,9 +49,9 @@ class WebSocketManager:
                         sensor_msg = SensorMessage(**data)  # Парсим в SensorMessage
                         await self._broadcast(sensor_msg)
                     except (json.JSONDecodeError, TypeError) as e:
-                        logger.error(f"Не удалось разобрать сообщение из Redis: {e}")
+                        logger.error(f"Could not parse message from Redis: {e}")
         except Exception as e:
-            logger.error(f"Ошибка слушателя Redis: {e}", exc_info=True)
+            logger.error(f"Redis listener error: {e}", exc_info=True)
         finally:
             await pubsub.unsubscribe(self.channel)
             await self.redis_client.close()
@@ -62,7 +62,7 @@ class WebSocketManager:
             try:
                 await client.send_text(message.model_dump_json())
             except Exception as e:
-                logger.error(f"Ошибка отправки клиенту: {e}")
+                logger.error(f"Error sending to client: {e}")
                 self.disconnect(client)  # Удаляем неотзывчивого клиента
 
     async def startup(self):

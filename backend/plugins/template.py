@@ -49,7 +49,7 @@ class DevicePlugin(ABC):
     async def start(self) -> AsyncGenerator[SensorMessage, Any]:
         """Запуск плагина — возвращает асинхронный генератор данных."""
         await self.init_hardware()
-        logger.info(f"Плагин {self.device_id} запущен")
+        logger.info(f"The {self.device_id} plugin is running")
         while await Plugins.is_running(self.device_id):
             try:
                 data = await self.read_data()
@@ -63,11 +63,11 @@ class DevicePlugin(ABC):
                     # Возвращаем данные с метаинформацией
                     yield result
             except Exception as e:
-                logger.error(f"Ошибка в цикле плагина {self.device_id}: {e}")
+                logger.error(f"Error in the plugin loop {self.device_id}: {e}")
 
             await asyncio.sleep(self.poll_interval)
 
     async def stop(self) -> None:
         """Остановка плагина."""
         self.is_running = False
-        logger.info(f"Плагин {self.device_id} остановлен")
+        logger.info(f"The {self.device_id} plugin has been stopped")

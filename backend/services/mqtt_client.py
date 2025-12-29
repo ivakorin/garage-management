@@ -37,7 +37,7 @@ class AsyncMQTTClient:
             return
 
         self._running = True
-        logger.info(f"Подключение к MQTT {self.broker}:{self.port}")
+        logger.info(f"Connecting to MQTT {self.broker}:{self.port}")
 
         # Запускаем фоновое переподключение
         self._reconnect_task = asyncio.create_task(self._reconnect_loop())
@@ -63,9 +63,9 @@ class AsyncMQTTClient:
                     for topic in self.subscriptions.keys():
                         try:
                             await self.client.subscribe(topic)
-                            logger.debug(f"Подписан на {topic}")
+                            logger.debug(f"Subscribed to {topic}")
                         except Exception as e:
-                            logger.warning(f"Не удалось подписаться на {topic}: {e}")
+                            logger.warning(f"Failed to subscribe to {topic}: {e}")
 
                     # Обработка сообщений
                     async for message in self.client.messages:
@@ -73,7 +73,7 @@ class AsyncMQTTClient:
                         try:
                             payload = json.loads(message.payload.decode())
                         except json.JSONDecodeError:
-                            logger.warning(f"Invalid JSON в сообщении: {message.payload}")
+                            logger.warning(f"Invalid JSON in message: {message.payload}")
                             continue
 
                         for subscribed_topic, callback in self.subscriptions.items():
@@ -82,18 +82,18 @@ class AsyncMQTTClient:
                                     asyncio.create_task(callback(payload))
                                 except Exception as e:
                                     logger.error(
-                                        f"Ошибка в callback для {topic}: {e}",
+                                        f"Error in callback for {topic}: {e}",
                                         exc_info=True,
                                     )
 
             except aiomqtt.MqttError as e:
                 self._is_connected = False
-                logger.warning(f"MQTT соединение потеряно: {e}. Повтор через 5 сек...")
+                logger.warning(f"MQTT connection lost: {e}. Repeat in 5 seconds...")
                 await asyncio.sleep(
                     5
                 )  # Только здесь задержка — не влияет на основной цикл
             except Exception as e:
-                logger.error(f"Неожиданная ошибка MQTT: {e}", exc_info=True)
+                logger.error(f"Unexpected MQTT error: {e}", exc_info=True)
                 self._is_connected = False
                 await asyncio.sleep(5)
             finally:
@@ -108,26 +108,26 @@ class AsyncMQTTClient:
     ) -> bool:
         """Публикует сообщение. Возвращает True при успехе."""
         if not self._is_connected or not self.client:
-            logger.warning(f"MQTT не подключён. Пропуск публикации: {topic}")
+            logger.warning(f"MQTT is not connected. Skipping a publication: {topic}")
             return False
 
         try:
             payload_str = json.dumps(payload)
             await self.client.publish(topic, payload_str, qos=qos, retain=retain)
-            logger.debug(f"Отправлено MQTT: {topic} → {payload_str}")
+            logger.debug(f"Sent by MQTT: {topic} → {payload_str}")
             return True
         except aiomqtt.MqttError as e:
             self._is_connected = False
-            logger.error(f"Ошибка MQTT publish: {e}")
+            logger.error(f"MQTT publish error: {e}")
             return False
         except Exception as e:
-            logger.error(f"Неожиданная ошибка при публикации {topic}: {e}", exc_info=True)
+            logger.error(f"Unexpected error when publishing {topic}: {e}", exc_info=True)
             return False
 
     def subscribe(self, topic: str, callback: Callable):
         """Регистрирует callback для топика."""
         self.subscriptions[topic] = callback
-        logger.debug(f"Подписка зарегистрирована: {topic}")
+        logger.debug(f"Subscription is registered: {topic}")
 
     async def unsubscribe(self, topic: str):
         """Отписывается от топика."""
@@ -135,9 +135,9 @@ class AsyncMQTTClient:
             if self.client and self._is_connected:
                 try:
                     await self.client.unsubscribe(topic)
-                    logger.debug(f"Отписан от {topic}")
+                    logger.debug(f"Unsubscribed from {topic}")
                 except Exception as e:
-                    logger.warning(f"Ошибка при отписке от {topic}: {e}")
+                    logger.warning(f"Error when unsubscribing from {topic}: {e}")
             self.subscriptions.pop(topic, None)
 
     async def disconnect(self):
@@ -155,7 +155,7 @@ class AsyncMQTTClient:
             except Exception:
                 pass
         self._is_connected = False
-        logger.info("MQTT клиент отключён")
+        logger.info("MQTT client is disabled")
 
     @property
     def is_connected(self):

@@ -27,20 +27,6 @@ services:
     container_name: redis-db
     ports:
       - "6379:6379"
-    #    environment:
-    #      - REDIS_PASSWORD=${GM__REDIS__PASSWORD:-}
-    #    command: >
-    #      sh -c "
-    #      if [ -n '$$REDIS_PASSWORD' ]; then
-    #        echo 'requirepass $$REDIS_PASSWORD' > /data/redis.conf;
-    #        # Явно активируем пользователя default
-    #        echo 'user default on +@all ~* >$$REDIS_PASSWORD' >> /data/redis.conf;
-    #      else
-    #        echo '' > /data/redis.conf;
-    #      fi;
-    #      echo 'appendonly yes' >> /data/redis.conf;
-    #      redis-server /data/redis.conf
-    #      "
     volumes:
       - ./redis/data:/data:rw
     networks:

@@ -55,4 +55,4 @@ async def restart_collector():
         plugins=plugins_list, db_session=active_db_session, redis_client=redis_client
     )
     collect_task = asyncio.create_task(data_collector.collect())
-    logger.info("DataCollector перезапущен с новыми плагинами")
+    logger.info("DataCollector restarted with new plugins")

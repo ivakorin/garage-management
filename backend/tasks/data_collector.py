@@ -34,16 +34,18 @@ class DataCollector:
         # Логируем плагины
         for i, p in enumerate(self.plugins):
             if not isinstance(p, DevicePlugin):
-                logger.error(f"Плагин №{i} — не экземпляр DevicePlugin: {type(p)} = {p}")
+                logger.error(
+                    f"Plugin No.{i} is not an instance of DevicePlugin: {type(p)} = {p}"
+                )
             else:
-                logger.info(f"Плагин №{i}: {p.device_id}")
+                logger.debug(f"Plugin No.{i}: {p.device_id}")
 
     async def collect(self):
         self._is_running = True
         logger.info("DataCollector started")
 
         if not self.plugins:
-            logger.error("Нет плагинов для опроса!")
+            logger.error("There are no poll plugins!")
             return
 
         # Инициализируем MQTT клиент (но не подключаемся сразу)
@@ -59,9 +61,9 @@ class DataCollector:
         for plugin in self.plugins:
             try:
                 plugin_generators[plugin.device_id] = plugin.start()
-                logger.debug(f"Генератор создан для {plugin.device_id}")
+                logger.debug(f"The generator was created for {plugin.device_id}")
             except Exception as e:
-                logger.error(f"Не удалось создать генератор для {plugin.device_id}: {e}")
+                logger.error(f"Failed to create generator for {plugin.device_id}: {e}")
 
         try:
             while self._is_running:
@@ -77,18 +79,18 @@ class DataCollector:
                             await self._save_to_db(message)
 
                         except StopAsyncIteration:
-                            logger.warning(f"Генератор {plugin.device_id} завершён")
+                            logger.warning(f"{plugin.device_id} generator completed")
                             plugin_generators[plugin.device_id] = plugin.start()
                             continue
                         except Exception as e:
                             logger.error(
-                                f"Ошибка при чтении из генератора {plugin.device_id}: {type(e).__name__}: {e}",
+                                f"Error when reading from the generator {plugin.device_id}: {type(e).__name__}: {e}",
                                 exc_info=True,
                             )
 
                     except Exception as e:
                         logger.error(
-                            f"Ошибка работы с плагином {plugin.device_id}: {type(e).__name__}: {e}",
+                            f"Error working with the plugin {plugin.device_id}: {type(e).__name__}: {e}",
                             exc_info=True,
                         )
                         continue
@@ -146,18 +148,18 @@ class DataCollector:
                 )
                 self.db_session.add(db_data)
                 await self.db_session.commit()
-                logger.info(f"Данные сохранены для устройства {message.device_id}")
+                logger.info(f"Data saved for device {message.device_id}")
                 # 1. Пытаемся отправить в Redis
                 await self._publish_to_redis(message)
                 # 1. Пытаемся отправить в MQTT
                 await self._publish_to_mqtt(message)
             else:
                 logger.debug(
-                    f"Данные не изменились для устройства {message.device_id}, пропуск сохранения"
+                    f"Data has not changed for device {message.device_id}, skipping saving"
                 )
 
         except Exception as e:
-            logger.error(f"Ошибка сохранения в БД: {e}")
+            logger.error(f"Error saving to database: {e}")
             await self.db_session.rollback()
 
     def _is_data_changed(
@@ -175,7 +177,7 @@ class DataCollector:
     async def _publish_to_redis(self, message: SensorMessage):
         """Публикация в Redis с переподключением при ошибке."""
         if not self.redis_client:
-            logger.warning("Redis клиент не инициализирован, пропуск публикации")
+            logger.warning("Redis client is not initialized, skipping publication")
             return
 
         try:
@@ -194,22 +196,22 @@ class DataCollector:
     async def _publish_to_mqtt(self, message: SensorMessage):
         """Публикация в MQTT с автоматической переподключкой при потере соединения."""
         if not self.mqtt_client:
-            logger.warning("MQTT клиент не инициализирован, пропуск публикации")
+            logger.warning("MQTT client is not initialized, skipping publication")
             return
 
         try:
             # Проверяем подключение перед отправкой
             if not self.mqtt_client._is_connected:
-                logger.info("MQTT не подключён, пытаемся подключиться...")
+                logger.info("MQTT is not connected, trying to connect...")
                 try:
                     await self.mqtt_client.connect()
                     if self.mqtt_client._is_connected:
-                        logger.info("MQTT подключение восстановлено")
+                        logger.info("MQTT connection restored")
                     else:
-                        logger.error("Не удалось подключиться к MQTT брокеру")
+                        logger.error("Couldn't connect to the MQTT broker")
                         return
                 except Exception as e:
-                    logger.error(f"Ошибка при подключении к MQTT: {e}")
+                    logger.error(f"Error connecting to MQTT: {e}")
                     return
 
             # Отправляем сообщение
@@ -217,13 +219,15 @@ class DataCollector:
             payload = json.dumps(message.data)
 
             await self.mqtt_client.publish(topic, payload)
-            logger.debug(f"Отправлено в MQTT: {topic} → {payload}")
+            logger.debug(f"Sent to MQTT: {topic} → {payload}")
 
         except (ConnectionError, OSError) as e:
-            logger.error(f"Разрыв соединения MQTT: {e}. Будет попытка переподключения.")
+            logger.error(
+                f"Disconnection MQTT: {e}. There will be an attempt to reconnect"
+            )
             # Клиент останется в состоянии "не подключён" — следующее сообщение вызовет reconnect
         except Exception as e:
             logger.error(
-                f"Неожиданная ошибка при публикации в MQTT: {type(e).__name__}: {e}",
+                f"Unexpected error when publishing in MQTT: {type(e).__name__}: {e}",
                 exc_info=True,
             )

@@ -1,6 +1,6 @@
 import logging
 
-from backend.core.settings import settings
+from core.settings import settings
 
 
 class SQLiteOpFilter(logging.Filter):
