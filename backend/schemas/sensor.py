@@ -9,6 +9,7 @@ class SensorMessage(BaseModel):
     timestamp: str
     data: Dict[str, Any]
     value: Optional[float] = None
+    unit: Optional[str] = None
 
 
 class DeviceBaseSchema(BaseModel):

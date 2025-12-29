@@ -58,6 +58,7 @@ class DevicePlugin(ABC):
                         device_id=self.device_id,
                         timestamp=datetime.now().isoformat(),
                         data=data,
+                        unit=data["unit"],
                     )
                     # Возвращаем данные с метаинформацией
                     yield result

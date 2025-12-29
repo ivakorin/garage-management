@@ -35,4 +35,5 @@ class DeviceData(Base):
     device_id: Mapped[str] = mapped_column(nullable=False)
     timestamp: Mapped[datetime] = mapped_column(default=datetime.now(), nullable=False)
     data: Mapped[str] = mapped_column(Text, nullable=False)  # JSON-строка
-    value: Mapped[Optional[float]]  # Опционально: числовое значение для агрегации
+    value: Mapped[Optional[float]]
+    unit: Mapped[Optional[str]]

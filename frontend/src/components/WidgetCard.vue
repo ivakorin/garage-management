@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {defineEmits, defineProps, onMounted, onUnmounted, reactive, ref} from 'vue'
+import {defineEmits, defineProps, onMounted, onUnmounted, ref} from 'vue'
 import type {Widget} from '../composables/useDraggableWidgets'
 import FormattedPluginName from './FormattedPluginName.vue'
 import {PhPencil} from '@phosphor-icons/vue'
@@ -8,7 +8,6 @@ import {readDeviceAPI} from '../api/devices.ts'
 import type {SensorsType} from '../../types/sensors.ts'
 import {SensorWebSocket} from '../ws/webSocket.ts'
 
-// Пропсы
 interface Props {
   data: Widget
   index: number
@@ -34,82 +33,68 @@ const isResizing = ref(false)
 const resizeEdge = ref<'' | 'se' | 'e' | 's'>('')
 const startWidth = ref(0)
 const startHeight = ref(0)
+
 const sensorData = ref<{
-  device_id: string,
+  device_id: string
   data: Record<string, number>
-  timestamp: string,
+  timestamp: string
   value: number
+  unit: string
 } | null>(null)
 
-sensorData.value = {
-  device_id: '',
-  data: reactive({}),
-  timestamp: '',
-  value: 0
-}
-
-// Состояние компонента
 const contentLoading = ref<boolean>(true)
 const currentItem = ref<SensorsType | null>(null)
 const showModal = ref<boolean>(false)
+const showDetails = ref<boolean>(false) // Управление всплывающим окном
 
-// Экземпляр WebSocket (объявляем, но не инициализируем сразу)
 let ws: SensorWebSocket | null = null
 
-// Загрузка данных и подключение к WebSocket
 const loadItem = async (): Promise<SensorsType> => {
   const response = await readDeviceAPI(props.data.device_id)
   currentItem.value = response
 
-  // Инициализируем WebSocket только после получения device_id
   ws = new SensorWebSocket('ws://127.0.0.1:8000/api/v1/ws')
-
   ws.connect()
-
-  // Подписка на обновления сенсора
   ws.subscribe(response.device_id)
 
-  // Обработчик входящих данных
   ws.onSensorUpdate(response.device_id, (data) => {
     sensorData.value = data
   })
 
-  // Проверка подписок через 3 секунды
-  setTimeout(() => {
-    ws?.getSubscriptions()
-  }, 3000)
-
+  setTimeout(() => ws?.getSubscriptions(), 3000)
   return response
 }
 
-const onUpdate = () => {
-  loadItem()
+const onUpdate = () => loadItem()
+const editItem = () => showModal.value = true
+const toggleDetails = () => {
+  console.log('Кнопка "View Details" нажата!') // Для отладки
+  showDetails.value = true
 }
+const handleRemove = () => props.editable && emit('remove', props.data.id)
 
-const editItem = () => {
-  showModal.value = true
-}
-
-// Обработчики drag (только если editable=true)
 const onMousedown = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (
+      target.classList.contains('details-btn') ||
+      target.classList.contains('resize-handle')
+  ) {
+    return
+  }
+
   if (!props.editable) return
-  if (e.target instanceof HTMLElement && e.target.classList.contains('resize-handle')) return
 
   isDragging.value = true
   offsetX.value = e.clientX - props.data.x
   offsetY.value = e.clientY - props.data.y
-
   document.addEventListener('mousemove', onMousemove)
   document.addEventListener('mouseup', onMouseup)
 }
 
 const onMousemove = (e: MouseEvent) => {
   if (!isDragging.value || !props.editable) return
-
-
   const newX = roundToGrid(e.clientX - offsetX.value)
   const newY = roundToGrid(e.clientY - offsetY.value)
-
   emit('update-position', {index: props.index, x: newX, y: newY})
 }
 
@@ -119,24 +104,18 @@ const onMouseup = () => {
   document.removeEventListener('mouseup', onMouseup)
 }
 
-// Обработчики resize (только если editable=true)
 const onResizeMousedown = (edge: 'se' | 'e' | 's') => {
   if (!props.editable) return
-
-
   isResizing.value = true
   resizeEdge.value = edge
   startWidth.value = props.data.width
   startHeight.value = props.data.height
-
-
   document.addEventListener('mousemove', onResizeMousemove)
   document.addEventListener('mouseup', onResizeMouseup)
 }
 
 const onResizeMousemove = (e: MouseEvent) => {
   if (!isResizing.value || !props.editable) return
-
 
   let newWidth = startWidth.value
   let newHeight = startHeight.value
@@ -156,7 +135,6 @@ const onResizeMousemove = (e: MouseEvent) => {
 
   newWidth = roundToGrid(newWidth)
   newHeight = roundToGrid(newHeight)
-
   newWidth = Math.max(newWidth, GRID_SIZE)
   newHeight = Math.max(newHeight, GRID_SIZE)
 
@@ -169,7 +147,7 @@ const onResizeMouseup = () => {
   document.removeEventListener('mousemove', onResizeMousemove)
   document.removeEventListener('mouseup', onResizeMouseup)
 }
-// Жизненные циклы
+
 onMounted(async () => {
   try {
     currentItem.value = await loadItem()
@@ -180,29 +158,16 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  // Закрываем WebSocket при уничтожении компонента
   if (ws) {
     ws.disconnect()
     ws = null
   }
-
-  // Очищаем слушатели событий
   document.removeEventListener('mousemove', onMousemove)
   document.removeEventListener('mouseup', onMouseup)
   document.removeEventListener('mousemove', onResizeMousemove)
   document.removeEventListener('mouseup', onResizeMouseup)
 })
-
-// Хелпер удаления (только если editable=true)
-const handleRemove = () => {
-  if (props.editable) {
-    emit('remove', props.data.id)
-  }
-}
-
 </script>
-
-
 <template>
   <div
       class="widget"
@@ -215,14 +180,10 @@ const handleRemove = () => {
     }"
       @mousedown="onMousedown"
   >
-    <!-- Загрузчик (Skeleton) при загрузке -->
-    <div v-if="contentLoading" class="skeleton-container">
+    <div v-if="contentLoading" class="skeleton-overlay">
       <n-skeleton height="100%" width="100%" :sharp="false"/>
     </div>
-
-    <!-- Основной контент (показываем только если не грузится) -->
-    <div v-else-if="currentItem && !contentLoading" class="widget-content-wrapper">
-      <!-- Заголовок и кнопка удаления -->
+    <div v-else-if="currentItem" class="widget-content-wrapper">
       <div class="widget-header">
         <h4 class="widget-title">
           <n-button
@@ -250,42 +211,86 @@ const handleRemove = () => {
         </button>
       </div>
 
-      <!-- Контент виджета -->
-      <div class="widget-content" v-if="sensorData">
-        <p><strong>Last seen:</strong>
-          {{ new Date(sensorData.timestamp).toLocaleString() }}</p>
-        <n-p>Value: {{ sensorData.value.toFixed() }}</n-p>
-        <n-list>
-          <n-list-item
-              v-for="(value, key) in Object.entries(sensorData.data)"
-              :key="`${key}-${sensorData.timestamp}`"
+      <div class="widget-content">
+        <div class="main-display">
+          <div class="value">{{ sensorData?.value?.toFixed(2) || '—' }}</div>
+          <div v-if="sensorData?.unit" class="unit">{{ sensorData.unit }}</div>
+        </div>
+        <n-space>
+          <n-button
+              @click="toggleDetails"
+              type="info"
+              size="tiny"
           >
-            {{ key }}: {{ value }}
-          </n-list-item>
-        </n-list>
+            Details
+          </n-button>
+          <n-button
+              type="primary"
+              size="tiny"
+          >
+            History
+          </n-button>
+        </n-space>
+        <n-modal
+            v-model:show="showDetails"
+            preset="card"
+            title="Sensor Details"
+            :bordered="false"
+            :mask-closable="true"
+            :close-on-esc="true"
+            :style="{ width: '600px' }"
+        >
+          <n-space vertical :size="12">
+            <n-card title="Last Update">
+              {{
+                sensorData?.timestamp ? new Date(sensorData.timestamp).toLocaleString() : '—'
+              }}
+            </n-card>
+            <n-card title="Main Data">
+              <n-descriptions
+                  :column="1"
+                  size="medium"
+              >
+                <n-descriptions-item label="Value">
+                  {{ sensorData?.value?.toFixed(2) || '—' }}
+                </n-descriptions-item>
+                <n-descriptions-item label="Unit">
+                  {{ sensorData?.unit || '—' }}
+                </n-descriptions-item>
+              </n-descriptions>
+            </n-card>
+            <n-card title="Sensor Data">
+              <n-list>
+                <n-list-item
+                    v-for="(value, key) in Object.entries(sensorData?.data || {})"
+                    :key="`${key}-${sensorData?.timestamp}`"
+                >
+                  <template #prefix>{{ key }}:</template>
+                  {{ value }}
+                </n-list-item>
+              </n-list>
+            </n-card>
+          </n-space>
+          <div style="margin-top: 16px; text-align: right;">
+            <n-button @click="showDetails = false">Close</n-button>
+          </div>
+        </n-modal>
       </div>
-
-      <!-- Ручки изменения размера (только если editable=true) -->
       <template v-if="editable">
-        <!-- Юго-восточный угол -->
         <div
             class="resize-handle se"
             @mousedown.prevent="onResizeMousedown('se')"
         />
-        <!-- Восточный край -->
         <div
             class="resize-handle e"
             @mousedown.prevent="onResizeMousedown('e')"
         />
-        <!-- Южный край -->
         <div
             class="resize-handle s"
             @mousedown.prevent="onResizeMousedown('s')"
         />
       </template>
     </div>
-
-    <!-- Модальное окно редактирования -->
     <edit-device
         v-if="currentItem"
         v-model:show="showModal"
@@ -295,23 +300,7 @@ const handleRemove = () => {
     />
   </div>
 </template>
-
 <style scoped>
-.sensor-item {
-  font-size: xx-small;
-}
-
-.sensor-key {
-  font-weight: 600;
-  color: #2c3e50;
-  margin-right: 8px;
-}
-
-.sensor-value {
-  color: #16a085;
-  font-family: monospace;
-}
-
 .widget {
   position: absolute;
   background-color: #ffffff;
@@ -321,22 +310,21 @@ const handleRemove = () => {
   user-select: none;
   touch-action: none;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
-/* Режим просмотра — блокируем взаимодействие и визуально приглушаем */
 .widget:not(.editable) {
   cursor: default !important;
-  pointer-events: none;
   opacity: 0.95;
   filter: saturate(0.8) brightness(0.98);
+  /* Убрано pointer-events: none */
 }
 
-/* Активное состояние при перетаскивании (только в режиме редактирования) */
 .widget.editable:active,
 .widget.editable.dragging {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   transform: scale(1.02);
-  z-index: 1000; /* Поднимаем над другими при перетаскивании */
+  z-index: 1000;
 }
 
 .widget-header {
@@ -346,6 +334,7 @@ const handleRemove = () => {
   padding: 12px 16px;
   background-color: #f8f9fa;
   border-bottom: 1px solid #e0e0e0;
+  gap: 8px;
 }
 
 .widget-title {
@@ -353,6 +342,9 @@ const handleRemove = () => {
   font-size: 14px;
   font-weight: 600;
   color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .remove-btn {
@@ -361,106 +353,161 @@ const handleRemove = () => {
   font-size: 18px;
   cursor: pointer;
   color: #666;
-  transition: color 0.2s;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
 }
 
 .remove-btn:hover {
   color: #d93025;
+  background-color: #ffeeed;
 }
 
 .widget-content {
   padding: 16px;
   color: #555;
   font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
-/* Ручки изменения размера (видимы только при наведении в режиме редактирования) */
+/* Главное отображение значения */
+.main-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.value {
+  font-size: 36px;
+  font-weight: bold;
+  color: #2c3e50;
+  line-height: 1;
+}
+
+.unit {
+  font-size: 18px;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+
+/* Ручки изменения размера */
 .resize-handle {
   position: absolute;
   background-color: transparent;
   cursor: se-resize;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  border-radius: 50%;
 }
 
 .widget.editable:hover .resize-handle {
   opacity: 1;
 }
 
-/* Юго‑восточный угол (диагональное изменение) */
 .resize-handle.se {
   width: 12px;
   height: 12px;
   bottom: -6px;
   right: -6px;
-  cursor: se-resize;
   background-color: #18a058;
-  border-radius: 50%;
   z-index: 1100;
 }
 
-/* Восточный край (изменение по горизонтали) */
 .resize-handle.e {
   width: 6px;
   height: calc(100% - 12px);
   top: 6px;
   right: -3px;
-  cursor: e-resize;
   background-color: #18a058;
   z-index: 1100;
 }
 
-/* Южный край (изменение по вертикали) */
 .resize-handle.s {
   height: 6px;
   width: calc(100% - 12px);
   bottom: -3px;
   left: 6px;
-  cursor: s-resize;
   background-color: #18a058;
   z-index: 1100;
 }
 
-/* Эффект наведения на виджет (только в режиме редактирования) */
-.widget.editable:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-/* Дополнительно: слегка затемняем виджеты в режиме редактирования, чтобы сетка была лучше видна */
-.widget.editable {
-  filter: brightness(0.98);
-}
-
-/* Контейнер для скелетона */
+/* Скелетон загрузки */
 .skeleton-overlay {
   position: absolute;
-  inset: 0; /* покрывает весь виджет */
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(255, 255, 255, 0.8); /* полупрозрачный белый фон */
-  backdrop-filter: blur(2px); /* лёгкий размыв фона */
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(2px);
   z-index: 1;
-  border-radius: inherit; /* наследуем радиус углов от .widget */
+  border-radius: inherit;
 }
 
-/* Плавное появление/скрытие скелетона */
+/* Плавное переключение между скелетоном и контентом */
 .skeleton-overlay,
 .widget-content-wrapper {
   transition: opacity 0.3s ease;
 }
 
-/* При загрузке — скелетон виден, контент скрыт */
 .widget[contentLoading="true"] .widget-content-wrapper {
   opacity: 0;
   pointer-events: none;
 }
 
-/* Когда не загружается — скелетон скрыт, контент виден */
 .widget:not([contentLoading="true"]) .skeleton-overlay {
   opacity: 0;
   pointer-events: none;
 }
-</style>
 
+/* Стили для компонентов Naive UI */
+:deep(.n-button) {
+  min-height: auto;
+  padding: 4px 8px;
+}
+
+:deep(.n-card) {
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+:deep(.n-card__header) {
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+:deep(.n-card__content) {
+  padding: 16px;
+}
+
+:deep(.n-descriptions) {
+  line-height: 1.6;
+}
+
+:deep(.n-descriptions-item__label) {
+  font-weight: 500;
+  color: #555;
+}
+
+:deep(.n-list-item) {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+:deep(.n-modal-body-wrapper) {
+  padding: 16px !important;
+}
+</style>
 

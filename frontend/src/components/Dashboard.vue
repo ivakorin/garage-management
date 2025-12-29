@@ -297,7 +297,7 @@ onMounted(() => {
 /* Виджеты */
 :deep(.widget:not(.editable)) {
   cursor: default !important;
-  pointer-events: none;
+  //pointer-events: none;
   opacity: 0.95;
   filter: saturate(0.8) brightness(0.98);
   transition: opacity 0.3s ease, filter 0.3s ease, box-shadow 0.2s ease;

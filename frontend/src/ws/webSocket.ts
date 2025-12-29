@@ -11,16 +11,13 @@ class SensorWebSocket {
     }
 
     async connect(): Promise<void> {
-        // Проверяем, что socket существует и уже открыт
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            console.log("WebSocket already connected");
             return;
         }
 
         this.socket = new WebSocket(this.url);
 
         this.socket.onopen = () => {
-            console.log("WebSocket connected");
             this.isConnected = true;
             this._resubscribeAll();
         };
@@ -35,7 +32,6 @@ class SensorWebSocket {
         };
 
         this.socket.onclose = () => {
-            console.log("WebSocket disconnected");
             this.isConnected = false;
             setTimeout(() => this.connect(), this.reconnectDelay);
         };
@@ -46,7 +42,6 @@ class SensorWebSocket {
     }
 
     subscribe(sensorId: string): void {
-        // Сначала проверяем, что socket не null
         if (!this.isConnected || !this.socket) {
             console.warn("WebSocket not ready. Will subscribe after connection.");
             if (!this._pendingSubscriptions) {
@@ -61,25 +56,21 @@ class SensorWebSocket {
             sensor_id: sensorId
         });
         this.socket.send(message);
-        console.log(`Subscribing to sensor: ${sensorId}`);
     }
 
     unsubscribe(sensorId: string): void {
-        // Проверяем socket на null и состояние
         if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
             const message = JSON.stringify({
                 action: "unsubscribe",
                 sensor_id: sensorId
             });
             this.socket.send(message);
-            console.log(`Unsubscribing from sensor: ${sensorId}`);
         } else {
             console.warn("Cannot unsubscribe: WebSocket is not open");
         }
     }
 
     getSubscriptions(): void {
-        // Аналогично — проверяем socket на null
         if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
             const message = JSON.stringify({action: "get_subscriptions"});
             this.socket.send(message);
@@ -98,7 +89,6 @@ class SensorWebSocket {
 
     private _handleMessage(data: any): void {
         if (data.status) {
-            console.log(`Status: ${data.status}`, data);
             return;
         }
         if (data.error) {
@@ -106,7 +96,6 @@ class SensorWebSocket {
             return;
         }
         if (data.subscriptions) {
-            console.log("Current subscriptions:", data.subscriptions);
             return;
         }
 
@@ -125,10 +114,8 @@ class SensorWebSocket {
     }
 
     disconnect(): void {
-        // Проверяем socket на null
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.close();
-            console.log("WebSocket closing...");
         }
     }
 
