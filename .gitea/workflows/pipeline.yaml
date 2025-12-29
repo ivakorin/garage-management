@@ -11,11 +11,11 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug Check current directory
-        run: |
-          pwd
-          ls -la
-          ls -la services/docker/
+      #      - name: Debug Check current directory
+      #        run: |
+      #          pwd
+      #          ls -la
+      #          ls -la services/docker/
       - name: Checkout repository
         uses: actions/checkout@v3
       # 1. Логинимся в реестр GitFlic
