@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import redis.asyncio as redis
 from sqlalchemy import select
@@ -30,6 +30,10 @@ class DataCollector:
         self.redis_client = redis_client
         self.mqtt_client: Optional[AsyncMQTTClient] = None
         self._is_running = False
+
+        # Буфер для batch-записи в БД
+        self._batch: List[SensorMessage] = []
+        self._last_batch_check = 0.0
 
         # Логируем плагины
         for i, p in enumerate(self.plugins):
@@ -74,9 +78,13 @@ class DataCollector:
                         # Читаем одно сообщение
                         try:
                             message = await generator.__anext__()
+                            message.value = self._extract_numeric_value(message.data)
+                            # 1. Добавляем в буфер для batch-записи
+                            self._batch.append(message)
 
-                            # 1. Сохраняем в БД (всегда)
-                            await self._save_to_db(message)
+                            # 2. Мгновенно отправляем в Redis и MQTT
+                            await self._publish_to_redis(message)
+                            await self._publish_to_mqtt(message)
 
                         except StopAsyncIteration:
                             logger.warning(f"{plugin.device_id} generator completed")
@@ -95,11 +103,23 @@ class DataCollector:
                         )
                         continue
 
-                await asyncio.sleep(0.1)
+                # Проверяем, пора ли записать batch в БД
+                now = asyncio.get_event_loop().time()
+                if (len(self._batch) >= 5) or (
+                    self._batch and (now - self._last_batch_check) >= 2.0
+                ):
+                    await self._save_batch_to_db(self._batch)
+                    self._batch = []
+                    self._last_batch_check = now
+
+                await asyncio.sleep(0.1)  # Небольшая задержка между итерациями
 
         except asyncio.CancelledError:
             logger.info("DataCollector cancelled")
         finally:
+            # Сохраняем оставшиеся данные в БД
+            if self._batch:
+                await self._save_batch_to_db(self._batch)
             await self._cleanup()
             logger.info("DataCollector stopped")
 
@@ -110,56 +130,62 @@ class DataCollector:
         if self.redis_client:
             await self.redis_client.close()
 
-    async def _save_to_db(self, message: SensorMessage):
-        """Сохранение в SQLAlchemy только при изменении данных."""
+    async def _save_batch_to_db(self, messages: List[SensorMessage]):
+        """Batch-сохранение в БД с проверкой изменений."""
+        if not messages:
+            return
+
         try:
-            # Проверка существования устройства
+            # Получаем все устройства из БД
+            device_ids = {msg.device_id for msg in messages}
             result = await self.db_session.execute(
-                select(Device).where(Device.device_id == message.device_id)
+                select(Device).where(Device.device_id.in_(device_ids))
             )
-            device = result.scalars().first()
+            devices = {dev.device_id: dev for dev in result.scalars().all()}
 
-            if not device:
-                device = Device(device_id=message.device_id, name=message.device_id)
-                self.db_session.add(device)
-
-            # Получаем последние данные
+            # Получаем последние данные для всех устройств
             last_data_result = await self.db_session.execute(
                 select(DeviceData)
-                .where(DeviceData.device_id == message.device_id)
+                .where(DeviceData.device_id.in_(device_ids))
                 .order_by(DeviceData.timestamp.desc())
-                .limit(1)
             )
-            last_data = last_data_result.scalars().first()
+            last_data_list = last_data_result.scalars().all()
+            last_data_map = {item.device_id: item for item in last_data_list}
 
-            if self._is_data_changed(last_data, message.data):
-                await DeviceDataCRUD.cleanup_old_data(
-                    session=self.db_session,
-                    device_id=message.device_id,
-                    retention_days=settings.app_settings.keep_data,
-                )
-                message.value = self._extract_numeric_value(message.data)
-                db_data = DeviceData(
-                    device_id=message.device_id,
-                    timestamp=datetime.fromisoformat(message.timestamp),
-                    data=json.dumps(message.data),
-                    value=message.value,
-                    unit=message.unit,
-                )
-                self.db_session.add(db_data)
+            to_insert: List[DeviceData] = []
+
+            for msg in messages:
+                # Создаём устройство, если его нет
+                if msg.device_id not in devices:
+                    device = Device(device_id=msg.device_id, name=msg.device_id)
+                    self.db_session.add(device)
+                    devices[msg.device_id] = device
+
+                # Проверяем изменение данных
+                last_data = last_data_map.get(msg.device_id)
+                if self._is_data_changed(last_data, msg.data):
+                    # Очищаем старые данные
+                    await DeviceDataCRUD.cleanup_old_data(
+                        session=self.db_session,
+                        device_id=msg.device_id,
+                        retention_days=settings.app_settings.keep_data,
+                    )
+                    db_data = DeviceData(
+                        device_id=msg.device_id,
+                        timestamp=datetime.fromisoformat(msg.timestamp),
+                        data=json.dumps(msg.data),
+                        value=msg.value,
+                        unit=msg.unit,
+                    )
+                    to_insert.append(db_data)
+
+            if to_insert:
+                self.db_session.add_all(to_insert)
                 await self.db_session.commit()
-                logger.info(f"Data saved for device {message.device_id}")
-                # 1. Пытаемся отправить в Redis
-                await self._publish_to_redis(message)
-                # 1. Пытаемся отправить в MQTT
-                await self._publish_to_mqtt(message)
-            else:
-                logger.debug(
-                    f"Data has not changed for device {message.device_id}, skipping saving"
-                )
+                logger.info(f"Batch saved to DB: {len(to_insert)} records")
 
         except Exception as e:
-            logger.error(f"Error saving to database: {e}")
+            logger.error(f"Error saving batch to database: {e}")
             await self.db_session.rollback()
 
     def _is_data_changed(
@@ -167,67 +193,82 @@ class DataCollector:
     ) -> bool:
         if last_data is None:
             return True
-        last_data_dict = json.loads(last_data.data)
-        return last_data_dict != new_data
+        try:
+            last_data_dict = json.loads(last_data.data)
+            return last_data_dict != new_data
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Error parsing last_data.data: {e}")
+            return True  # При ошибке считаем, что данные изменились
 
     def _extract_numeric_value(self, data: Dict[str, Any]) -> Optional[float]:
         numeric = [v for v in data.values() if isinstance(v, (int, float))]
         return sum(numeric) / len(numeric) if numeric else None
 
     async def _publish_to_redis(self, message: SensorMessage):
-        """Публикация в Redis с переподключением при ошибке."""
+        """Публикация в Redis с повторной попыткой и разумной задержкой."""
         if not self.redis_client:
             logger.warning("Redis client is not initialized, skipping publication")
             return
 
-        try:
-            # Проверяем подключение (ping)
-            await self.redis_client.ping()
-            await self.redis_client.publish("sensor_updates", message.model_dump_json())
-            logger.info(f"Sent to Redis: sensor_updates → {message.device_id}")
-        except (redis.ConnectionError, redis.TimeoutError) as e:
-            logger.error(
-                f"Error connecting to Redis: {e}. There will be a second attempt."
-            )
-            # Можно добавить retry с задержкой
-        except Exception as e:
-            logger.error(f"Unexpected Redis error: {e}")
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                await self.redis_client.ping()
+                await self.redis_client.publish(
+                    "sensor_updates", message.model_dump_json()
+                )
+                logger.info(f"Sent to Redis: sensor_updates → {message.device_id}")
+                return  # Успешно отправили — выходим
+
+            except (redis.ConnectionError, redis.TimeoutError) as e:
+                logger.warning(f"Redis error (attempt {attempt + 1}): {e}")
+                if attempt < max_retries:
+                    await asyncio.sleep(0.5)  # Задержка перед повторной попыткой
+                else:
+                    logger.error("Max retries exceeded for Redis publication")
+            except Exception as e:
+                logger.error(f"Unexpected Redis error: {type(e).__name__}: {e}")
+                break
 
     async def _publish_to_mqtt(self, message: SensorMessage):
-        """Публикация в MQTT с автоматической переподключкой при потере соединения."""
+        """Публикация в MQTT с переподключением и задержками."""
         if not self.mqtt_client:
             logger.warning("MQTT client is not initialized, skipping publication")
             return
 
-        try:
-            # Проверяем подключение перед отправкой
-            if not self.mqtt_client._is_connected:
-                logger.info("MQTT is not connected, trying to connect...")
-                try:
-                    await self.mqtt_client.connect()
-                    if self.mqtt_client._is_connected:
-                        logger.info("MQTT connection restored")
-                    else:
-                        logger.error("Couldn't connect to the MQTT broker")
-                        return
-                except Exception as e:
-                    logger.error(f"Error connecting to MQTT: {e}")
-                    return
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                if not self.mqtt_client._is_connected:
+                    logger.info("MQTT not connected, attempting reconnect...")
+                    try:
+                        await self.mqtt_client.connect()
+                        if self.mqtt_client._is_connected:
+                            logger.info("MQTT reconnected successfully")
+                        else:
+                            logger.error("Failed to reconnect to MQTT broker")
+                            return
+                    except Exception as conn_err:
+                        logger.error(f"MQTT reconnect failed: {conn_err}")
+                        if attempt < max_retries:
+                            await asyncio.sleep(1.0)
+                        continue
 
-            # Отправляем сообщение
-            topic = f"devices/{message.device_id}/data"
-            payload = json.dumps(message.data)
+                topic = f"devices/{message.device_id}/data"
+                payload = json.dumps(message.data)
 
-            await self.mqtt_client.publish(topic, payload)
-            logger.debug(f"Sent to MQTT: {topic} → {payload}")
+                await self.mqtt_client.publish(topic, payload, qos=1)
+                logger.debug(f"Sent to MQTT: {topic} → {payload}")
+                return  # Успешно отправили — выходим
 
-        except (ConnectionError, OSError) as e:
-            logger.error(
-                f"Disconnection MQTT: {e}. There will be an attempt to reconnect"
-            )
-            # Клиент останется в состоянии "не подключён" — следующее сообщение вызовет reconnect
-        except Exception as e:
-            logger.error(
-                f"Unexpected error when publishing in MQTT: {type(e).__name__}: {e}",
-                exc_info=True,
-            )
+            except (ConnectionError, OSError) as e:
+                logger.warning(f"MQTT error (attempt {attempt + 1}): {e}")
+                if attempt < max_retries:
+                    await asyncio.sleep(1.0)
+                else:
+                    logger.error("Max MQTT publish retries exceeded")
+            except Exception as e:
+                logger.error(
+                    f"Unexpected MQTT error: {type(e).__name__}: {e}", exc_info=True
+                )
+                break

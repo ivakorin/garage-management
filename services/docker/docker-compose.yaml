@@ -30,7 +30,7 @@ services:
     image: registry.gitflic.ru/project/ivakorin/garage-management/garage-management-frontend:latest
     container_name: garage-management-frontend
     ports:
-      - "127.0.0.1:81:80"
+      - "81:80"
     environment:
       - GM__BACK__API__URL=${GM__BACK__API__URL}
       - GM__BACK__WS__URL=${GM__BACK__WS__URL}
