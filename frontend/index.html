@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"/>
+    <meta charset="utf-8"/>
     <link rel="icon" type="image/svg+xml" href="/icon.svg"/>
     <meta name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -9,6 +9,17 @@
 </head>
 <body>
 <div id="app"></div>
+<!--
+  Шаблоны для Nginx:
+  - __GM__API__URL__ → будет заменён на значение $GM__API__URL
+  - __GM__WS__URL__ → будет заменён на значение $GM__WS__URL
+-->
+<script defer>
+    window._env = {
+        API_URL: "__GM__API__URL__",
+        WS_URL: "__GM__WS__URL__"
+    };
+</script>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

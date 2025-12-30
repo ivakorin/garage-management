@@ -1,14 +1,12 @@
+import {config} from "../config";
+
 class SensorWebSocket {
-    private url: string;
+    private url: string = config.GM__WS__URL
     private socket: WebSocket | null = null;
     private messageHandlers: Map<string, (data: any) => void> = new Map();
     private isConnected: boolean = false;
     private reconnectDelay: number = 1000;
     private _pendingSubscriptions: Set<string> | null = null;
-
-    constructor(url: string = "ws://127.0.0.1:8000/api/v1/ws") {
-        this.url = url;
-    }
 
     async connect(): Promise<void> {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {

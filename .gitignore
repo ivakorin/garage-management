@@ -260,7 +260,7 @@ http-client.private.env.json
 
 # Github Copilot persisted session migrations, see: https://github.com/microsoft/copilot-intellij-feedback/issues/712#issuecomment-3322062215
 .idea/**/copilot.data.migration.*.xml
-backend/db/database.db
+backend/db/base/database.db
 services/docker/mosquitto/config/*
 services/docker/mosquitto/data/*
 services/docker/mosquitto/log/*

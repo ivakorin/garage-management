@@ -49,7 +49,7 @@ const loadItem = async (): Promise<SensorsType> => {
   const response = await readDeviceAPI(props.data.device_id)
   currentItem.value = response
 
-  ws = new SensorWebSocket('ws://127.0.0.1:8000/api/v1/ws')
+  ws = new SensorWebSocket()
   ws.connect()
   ws.subscribe(response.device_id)
 

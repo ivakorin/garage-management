@@ -1,11 +1,12 @@
 import axios, {type AxiosInstance} from 'axios';
+import {config} from "../config";
 
 declare module '@vue/runtime-core' {
     interface ComponentCustomProperties {
         $axios: AxiosInstance;
     }
 }
-const BaseUrl = 'http://127.0.0.1:8000/api/v1';
+const BaseUrl = config.GM__API__URL;
 const api = axios.create({baseURL: BaseUrl, withCredentials: false});
 // api.interceptors.request.use(
 //   (config) => {

@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Database(BaseSettings):
     database: str = "database.db"
     patch: str = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "db", database
+        os.path.dirname(os.path.abspath(__file__)), "..", "db", "base", database
     )
 
     @property
@@ -17,7 +17,6 @@ class Database(BaseSettings):
 class Redis(BaseSettings):
     host: str
     port: int
-    password: str
     db: int = 0
 
     @property
