@@ -30,6 +30,9 @@ class DataCollector:
         self.redis_client = redis_client
         self.mqtt_client: Optional[AsyncMQTTClient] = None
         self._is_running = False
+        self._last_data_cache = {}  # Кеш для parsed data по device_id
+        self._last_redis_ping = 0.0  # Время последнего успешного ping Redis
+        self._last_mqtt_check = 0.0  # Время последней проверки соединения MQTT
 
         # Буфер для batch-записи в БД
         self._batch: List[SensorMessage] = []
@@ -71,6 +74,8 @@ class DataCollector:
 
         try:
             while self._is_running:
+                data_received = False  # Флаг: получили ли хоть одно сообщение
+
                 for plugin in self.plugins:
                     try:
                         generator = plugin_generators[plugin.device_id]
@@ -82,9 +87,13 @@ class DataCollector:
                             # 1. Добавляем в буфер для batch-записи
                             self._batch.append(message)
 
-                            # 2. Мгновенно отправляем в Redis и MQTT
-                            await self._publish_to_redis(message)
-                            await self._publish_to_mqtt(message)
+                            # 2. Мгновенно отправляем в Redis и MQTT (параллельно)
+                            await asyncio.gather(
+                                self._publish_to_redis(message),
+                                self._publish_to_mqtt(message),
+                                return_exceptions=True,
+                            )
+                            data_received = True
 
                         except StopAsyncIteration:
                             logger.warning(f"{plugin.device_id} generator completed")
@@ -103,6 +112,10 @@ class DataCollector:
                         )
                         continue
 
+                # Спать только если данных не было
+                if not data_received:
+                    await asyncio.sleep(0.1)
+
                 # Проверяем, пора ли записать batch в БД
                 now = asyncio.get_event_loop().time()
                 if (len(self._batch) >= 5) or (
@@ -111,8 +124,6 @@ class DataCollector:
                     await self._save_batch_to_db(self._batch)
                     self._batch = []
                     self._last_batch_check = now
-
-                await asyncio.sleep(0.1)  # Небольшая задержка между итерациями
 
         except asyncio.CancelledError:
             logger.info("DataCollector cancelled")
@@ -153,6 +164,9 @@ class DataCollector:
             last_data_map = {item.device_id: item for item in last_data_list}
 
             to_insert: List[DeviceData] = []
+            to_cleanup: set = (
+                set()
+            )  # Устройства, для которых нужно почистить старые записи
 
             for msg in messages:
                 # Создаём устройство, если его нет
@@ -164,12 +178,7 @@ class DataCollector:
                 # Проверяем изменение данных
                 last_data = last_data_map.get(msg.device_id)
                 if self._is_data_changed(last_data, msg.data):
-                    # Очищаем старые данные
-                    await DeviceDataCRUD.cleanup_old_data(
-                        session=self.db_session,
-                        device_id=msg.device_id,
-                        retention_days=settings.app_settings.keep_data,
-                    )
+                    to_cleanup.add(msg.device_id)  # Помечаем для очистки
                     db_data = DeviceData(
                         device_id=msg.device_id,
                         timestamp=datetime.fromisoformat(msg.timestamp),
@@ -178,6 +187,15 @@ class DataCollector:
                         unit=msg.unit,
                     )
                     to_insert.append(db_data)
+
+            # Очищаем старые записи один раз для всех затронутых устройств
+            if to_cleanup:
+                for dev_id in to_cleanup:
+                    await DeviceDataCRUD.cleanup_old_data(
+                        session=self.db_session,
+                        device_id=dev_id,
+                        retention_days=settings.app_settings.keep_data,
+                    )
 
             if to_insert:
                 self.db_session.add_all(to_insert)
@@ -193,12 +211,18 @@ class DataCollector:
     ) -> bool:
         if last_data is None:
             return True
-        try:
-            last_data_dict = json.loads(last_data.data)
-            return last_data_dict != new_data
-        except (json.JSONDecodeError, TypeError) as e:
-            logger.error(f"Error parsing last_data.data: {e}")
-            return True  # При ошибке считаем, что данные изменились
+
+        # Получаем кешированный dict для этого device_id
+        cached = self._last_data_cache.get(last_data.device_id)
+        if cached is None:
+            try:
+                cached = json.loads(last_data.data)
+                self._last_data_cache[last_data.device_id] = cached
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.error(f"Error parsing last_data.data: {e}")
+                return True  # При ошибке считаем, что данные изменились
+
+        return cached != new_data
 
     def _extract_numeric_value(self, data: Dict[str, Any]) -> Optional[float]:
         numeric = [v for v in data.values() if isinstance(v, (int, float))]
@@ -210,10 +234,19 @@ class DataCollector:
             logger.warning("Redis client is not initialized, skipping publication")
             return
 
+        now = asyncio.get_event_loop().time()
+        # Проверяем соединение раз в 10 секунд
+        if not hasattr(self, "_last_redis_ping") or now - self._last_redis_ping >= 10.0:
+            try:
+                await self.redis_client.ping()
+                self._last_redis_ping = now
+            except (redis.ConnectionError, redis.TimeoutError) as e:
+                logger.error(f"Redis ping failed: {e}")
+                return  # Не отправляем, пока не восстановим соединение
+
         max_retries = 2
         for attempt in range(max_retries + 1):
             try:
-                await self.redis_client.ping()
                 await self.redis_client.publish(
                     "sensor_updates", message.model_dump_json()
                 )
@@ -236,24 +269,26 @@ class DataCollector:
             logger.warning("MQTT client is not initialized, skipping publication")
             return
 
+        now = asyncio.get_event_loop().time()
+        # Проверяем соединение раз в 5 секунд
+        if not hasattr(self, "_last_mqtt_check") or now - self._last_mqtt_check >= 5.0:
+            if not self.mqtt_client._is_connected:
+                logger.info("MQTT not connected, attempting reconnect...")
+                try:
+                    await self.mqtt_client.connect()
+                    if self.mqtt_client._is_connected:
+                        logger.info("MQTT reconnected successfully")
+                        self._last_mqtt_check = now
+                    else:
+                        logger.error("Failed to reconnect to MQTT broker")
+                        return
+                except Exception as conn_err:
+                    logger.error(f"MQTT reconnect failed: {conn_err}")
+                    return
+
         max_retries = 2
         for attempt in range(max_retries + 1):
             try:
-                if not self.mqtt_client._is_connected:
-                    logger.info("MQTT not connected, attempting reconnect...")
-                    try:
-                        await self.mqtt_client.connect()
-                        if self.mqtt_client._is_connected:
-                            logger.info("MQTT reconnected successfully")
-                        else:
-                            logger.error("Failed to reconnect to MQTT broker")
-                            return
-                    except Exception as conn_err:
-                        logger.error(f"MQTT reconnect failed: {conn_err}")
-                        if attempt < max_retries:
-                            await asyncio.sleep(1.0)
-                        continue
-
                 topic = f"devices/{message.device_id}/data"
                 payload = json.dumps(message.data)
 
