@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
         logger.info("Database initialized")
-        await ws_manager.startup()
+        # await ws_manager.startup()
         async with async_session_context() as db_session:
             loaded_plugins = await load_plugins(db_session)
             plugins.clear()
