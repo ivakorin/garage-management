@@ -37,6 +37,8 @@ services:
     networks:
       - iot-network
     restart: unless-stopped
+    depends_on:
+      - garage-management
 
   mqtt:
     image: eclipse-mosquitto:2
