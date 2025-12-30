@@ -1,7 +1,7 @@
 FROM python:3.14-alpine AS base
 
 LABEL maintainer="Ignat Vakorin https://vakorin.net"
-
+RUN apk add --no-cache curl
 RUN pip install poetry
 
 WORKDIR /app

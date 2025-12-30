@@ -1,9 +1,48 @@
 services:
+  backend:
+    image: registry.gitflic.ru/project/ivakorin/garage-management/garage-management:latest
+    container_name: garage-management
+    ports:
+      - "8000:8000"
+    environment:
+      - GM__REDIS__HOST=${GM__REDIS__HOST}
+      - GM__REDIS__PORT=${GM__REDIS__PORT}
+      - GM__MQTT__HOST=${GM__MQTT__HOST}
+      - GM__MQTT__PORT=${GM__MQTT__PORT}
+      - GM__MQTT__USERNAME=${GM__MQTT__USERNAME}
+      - GM__MQTT__PASSWORD=${GM__MQTT__PASSWORD}
+      - GM__APP_SETTINGS__KEEP_DATA=${GM__APP_SETTINGS__KEEP_DATA}
+      - GM__LOG__LEVEL=${GM__LOG__LEVEL}
+    volumes:
+      - ./base:/app/db/base
+      - ./plugins:/app/plugins
+    networks:
+      - iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/docs" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    image: registry.gitflic.ru/project/ivakorin/garage-management/garage-management-frontend:latest
+    container_name: garage-management-frontend
+    ports:
+      - "127.0.0.1:81:80"
+    environment:
+      - GM__BACK__API__URL=${GM__BACK__API__URL}
+      - GM__BACK__WS__URL=${GM__BACK__WS__URL}
+    networks:
+      - iot-network
+    restart: unless-stopped
+
   mqtt:
     image: eclipse-mosquitto:2
     container_name: mqtt-broker
     ports:
-      - "1884:1883"
+      - "1883:1883"
     environment:
       - GM__MQTT__USERNAME=${GM__MQTT__USERNAME:-mqtt}
       - GM__MQTT__PASSWORD=${GM__MQTT__PASSWORD:-mqtt}
