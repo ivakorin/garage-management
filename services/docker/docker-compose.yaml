@@ -3,7 +3,7 @@ services:
     image: registry.gitflic.ru/project/ivakorin/garage-management/garage-management:latest
     container_name: garage-management
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:80"
     environment:
       - GM__REDIS__HOST=${GM__REDIS__HOST}
       - GM__REDIS__PORT=${GM__REDIS__PORT}
