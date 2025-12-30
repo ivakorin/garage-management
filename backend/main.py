@@ -75,10 +75,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    "https://your-domain.com",
+]
+
+allow_all_origins = True
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins if not allow_all_origins else ["*"],
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
         "*",
