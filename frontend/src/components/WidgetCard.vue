@@ -64,7 +64,6 @@ const loadItem = async (): Promise<SensorsType> => {
 const onUpdate = () => loadItem()
 const editItem = () => showModal.value = true
 const toggleDetails = () => {
-  console.log('Кнопка "View Details" нажата!') // Для отладки
   showDetails.value = true
 }
 const handleRemove = () => props.editable && emit('remove', props.data.id)
@@ -242,16 +241,14 @@ onUnmounted(() => {
             :style="{ width: '600px' }"
         >
           <n-space vertical :size="12">
-            <n-card title="Last Update">
-              {{
-                sensorData?.timestamp ? new Date(sensorData.timestamp).toLocaleString() : '—'
-              }}
-            </n-card>
             <n-card title="Main Data">
               <n-descriptions
                   :column="1"
                   size="medium"
               >
+                <n-descriptions-item label="Device ID">
+                  {{ sensorData?.device_id || '—' }}
+                </n-descriptions-item>
                 <n-descriptions-item label="Value">
                   {{ sensorData?.value?.toFixed(2) || '—' }}
                 </n-descriptions-item>
@@ -260,14 +257,20 @@ onUnmounted(() => {
                 </n-descriptions-item>
               </n-descriptions>
             </n-card>
+            <n-card title="Last Update">
+              {{
+                sensorData?.timestamp ? new Date(sensorData.timestamp).toLocaleString() : '—'
+              }}
+            </n-card>
             <n-card title="Sensor Data">
               <n-list>
                 <n-list-item
                     v-for="(value, key) in Object.entries(sensorData?.data || {})"
                     :key="`${key}-${sensorData?.timestamp}`"
                 >
-                  <template #prefix>{{ key }}:</template>
-                  {{ value }}
+                  {{
+                    value[0] == 'unit' ? `Measure unit: ${value[1]}` : `Sensor: ${value[0]}, value: ${value[1]}`
+                  }}
                 </n-list-item>
               </n-list>
             </n-card>
