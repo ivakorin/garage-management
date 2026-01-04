@@ -28,6 +28,7 @@ class DeviceReadSchema(DeviceBaseSchema):
         "str_to_lower": False,
     }
     timestamp: datetime
+    value: Optional[Any] = None
 
 
 class DeviceUpdateSchema(BaseModel):

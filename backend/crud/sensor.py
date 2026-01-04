@@ -99,6 +99,7 @@ class DeviceDataCRUD:
         subq = (
             select(
                 DeviceData.device_id,
+                DeviceData.value,
                 func.max(DeviceData.timestamp).label("max_timestamp"),
             )
             .group_by(DeviceData.device_id)
@@ -129,6 +130,7 @@ class DeviceDataCRUD:
         device, device_data = row
         device_dict = device.__dict__.copy()
         device_dict["timestamp"] = device_data.timestamp if device_data else None
+        device_dict["value"] = device_data.value if device_data else None
         return DeviceReadSchema.model_validate(device_dict, from_attributes=True)
 
     @staticmethod
