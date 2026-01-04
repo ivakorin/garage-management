@@ -19,6 +19,9 @@ async def load_plugins(db_session: AsyncSession) -> dict:
     log.info(f"Loading plugins from {plugins_dir}")
 
     for filename in os.listdir(plugins_dir):
+        if filename.endswith("example.py"):
+            log.info(f"Skip loading plugin {filename}. Do you still want to use it? Remove \"example\" from filename and reload")
+            continue
         if filename.endswith(".py") and filename not in ("__init__.py", "template.py"):
             prefix = filename.split("_")[0]
             module_name = f"plugins.{filename[:-3]}"

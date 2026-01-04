@@ -1,6 +1,12 @@
 FROM python:3.14-alpine AS base
 
 LABEL maintainer="Ignat Vakorin https://vakorin.net"
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        python3-dev \
+        libgpiod-dev \
+        libgpiod2
 RUN apk add --no-cache curl
 RUN pip install poetry
 

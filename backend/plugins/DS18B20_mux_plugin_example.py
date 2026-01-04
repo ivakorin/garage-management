@@ -8,7 +8,7 @@ from .template import DevicePlugin
 logger = logging.getLogger(__name__)
 
 
-class DS18B20MuxPlugin(DevicePlugin):
+class DS18B20MuxPluginExample(DevicePlugin):
     """
     Плагин для имитации DS18B20, подключённого через CD74HC4067.
     Генерирует виртуальные температурные данные.
