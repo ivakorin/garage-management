@@ -1,18 +1,22 @@
-FROM python:3.14-alpine AS base
+FROM python:3.14-slim-trixie
+
 
 LABEL maintainer="Ignat Vakorin https://vakorin.net"
 
-# Обновление репозиториев и установка зависимостей
-RUN apk update && \
-    apk add --no-cache \
-        g++ \
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
         python3-dev \
         libgpiod-dev \
-        libgpiod \
+        libgpiod2 \
         curl \
         i2c-tools \
-        linux-headers \
-    && pip install poetry
+        linux-headers-$(uname -r) \
+    && rm -rf /var/lib/apt/lists/*
+
+
+RUN pip install poetry
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -22,8 +26,7 @@ COPY poetry.lock pyproject.toml ./
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-interaction --no-ansi --only main
 
+
 COPY backend/ /app/
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--proxy-headers", "--forwarded-allow-ips=*"]
-
-
