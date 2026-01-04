@@ -1,4 +1,4 @@
-FROM python:3.14-slim-trixie
+FROM python:3.14-slim-bookworm
 
 
 LABEL maintainer="Ignat Vakorin https://vakorin.net"
