@@ -83,7 +83,8 @@ class DataCollector:
                         # Читаем одно сообщение
                         try:
                             message = await generator.__anext__()
-                            message.value = self._extract_numeric_value(message.data)
+                            if not message.value:
+                                message.value = self._extract_numeric_value(message.data)
                             # 1. Добавляем в буфер для batch-записи
                             self._batch.append(message)
 

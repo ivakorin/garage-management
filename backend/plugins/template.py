@@ -62,6 +62,8 @@ class DevicePlugin(ABC):
                         data=data,
                         unit=data["unit"],
                     )
+                    if data.get("value"):
+                        result.value = data["value"]
                     yield result
             except Exception as e:
                 logger.error(f"Error in the plugin loop {self.device_id}: {e}")
