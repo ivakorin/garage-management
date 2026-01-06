@@ -226,6 +226,8 @@ class DataCollector:
         return cached != new_data
 
     def _extract_numeric_value(self, data: Dict[str, Any]) -> Optional[float]:
+        if data.get("value"):
+            return float(data.get("value"))
         numeric = [v for v in data.values() if isinstance(v, (int, float))]
         return sum(numeric) / len(numeric) if numeric else None
 
