@@ -16,8 +16,17 @@ services:
     volumes:
       - ./base:/app/db/base
       - ./plugins:/app/plugins
+      - /sys:/sys:rw
+      - /dev:/dev
+      - /lib/modules:/lib/modules:ro
     networks:
       - iot-network
+    devices:
+      - /dev/gpiomem:/dev/gpiomem
+      - /dev/i2c-1:/dev/i2c-1
+    cap_add:
+      - SYS_ADMIN
+      - DAC_OVERRIDE
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:80/docs" ]
@@ -25,12 +34,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      - redis
 
   frontend:
     image: registry.gitflic.ru/project/ivakorin/garage-management/garage-management-frontend:latest
     container_name: garage-management-frontend
     ports:
-      - "81:80"
+      - "80:80"
     environment:
       - GM__BACK__API__URL=${GM__BACK__API__URL}
       - GM__BACK__WS__URL=${GM__BACK__WS__URL}
