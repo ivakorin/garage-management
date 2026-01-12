@@ -61,6 +61,7 @@ class DevicePlugin(ABC):
                         timestamp=datetime.now().isoformat(),
                         data=data,
                         unit=data["unit"],
+                        online=data.get("online"),
                     )
                     if data.get("value"):
                         result.value = data["value"]

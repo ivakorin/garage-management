@@ -8,6 +8,7 @@ type SensorsType = {
     timestamp: string
     type: "sensors"
     unit: string
+    online: boolean
 }
 
 type UpdateSensorType = {

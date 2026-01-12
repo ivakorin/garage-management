@@ -10,6 +10,7 @@ class SensorMessage(BaseModel):
     data: Dict[str, Any]
     value: Optional[float] = None
     unit: str
+    online: Optional[bool] = None
 
 
 class DeviceBaseSchema(BaseModel):
@@ -29,14 +30,16 @@ class DeviceReadSchema(DeviceBaseSchema):
     }
     timestamp: datetime
     value: Optional[Any] = None
+    online: bool
 
 
 class DeviceUpdateSchema(BaseModel):
-    id: int
+    id: Optional[int] = None
     device_id: str
     name: Optional[str] = None
     description: Optional[str] = None
     updated_at: Optional[datetime] = None
+    online: bool
 
     def model_post_init(self, __context):
         if not any(self.__dict__.values()):

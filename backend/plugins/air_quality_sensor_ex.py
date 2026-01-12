@@ -27,7 +27,13 @@ class AirQualitySensorPlugin(DevicePlugin):
         """Имитация чтения данных с датчика CO₂ с реалистичной динамикой."""
 
         now = time.time()
-
+        result = {
+            "co2": None,
+            "unit": "ppm",
+            "status": None,
+            "timestamp": datetime.now().isoformat(),
+            "online": False,
+        }
         # Обновляем значение раз в 30–120 секунд (реалистичный интервал)
         if now - self.last_update < random.uniform(30, 120):
             # Возвращаем текущее значение без изменений
@@ -53,13 +59,12 @@ class AirQualitySensorPlugin(DevicePlugin):
             status = "elevated"  # Повышенный, рекомендуется проветривание
         else:
             status = "high"  # Высокий, требуется вентиляция
+        result["status"] = status
+        result["co2"] = round(co2, 1)
+        result["timestamp"] = datetime.now().isoformat()
+        result["online"] = True
 
-        return {
-            "co2": round(co2, 1),
-            "unit": "ppm",
-            "status": status,
-            "timestamp": datetime.now().isoformat(),
-        }
+        return result
 
     async def handle_command(self, command: dict) -> dict:
         """Обработка команд (если нужны)."""

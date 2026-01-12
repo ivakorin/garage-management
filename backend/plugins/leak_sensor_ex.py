@@ -21,17 +21,23 @@ class LeakSensorPlugin(DevicePlugin):
 
     async def read_data(self) -> dict:
         """Имитация чтения состояния датчика."""
+        result = {
+            "leak": None,
+            "alert": None,
+            "unit": "boolean",
+            "message": None,
+            "online": False,
+        }
         leak = random.random() < self.leak_probability
         if leak:
             data = 1
         else:
             data = 0
-        return {
-            "leak": data,
-            "alert": leak,
-            "unit": "boolean",
-            "message": "Протечка!" if leak else "Всё сухо",
-        }
+        result["leak"] = data
+        result["alert"] = leak
+        result["message"] = "Протечка!" if leak else "Всё сухо"
+        result["online"] = True
+        return result
 
     async def handle_command(self, command: dict) -> dict:
         """Обработка команд."""

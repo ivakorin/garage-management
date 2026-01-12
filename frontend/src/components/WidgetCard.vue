@@ -2,7 +2,7 @@
 import {onMounted, onUnmounted, ref} from 'vue'
 import type {Widget} from '../composables/useDraggableWidgets'
 import FormattedPluginName from './FormattedPluginName.vue'
-import {PhPencil} from '@phosphor-icons/vue'
+import {PhCheckCircle, PhMinusCircle, PhPencil} from '@phosphor-icons/vue'
 import EditDevice from '../dialogs/editDevice.vue'
 import {readDeviceAPI} from '../api/devices.ts'
 import type {SensorDataReadType, SensorsType} from '../../types/sensors.ts'
@@ -183,13 +183,22 @@ onUnmounted(() => {
       <n-skeleton height="100%" width="100%" :sharp="false"/>
     </div>
     <div v-else-if="currentItem" class="widget-content-wrapper">
+
       <div class="widget-header">
         <h4 class="widget-title">
+          <n-icon :size="16"
+                  :color="currentItem.online ? 'green' : 'red'">
+            <template v-if="currentItem.online">
+              <PhCheckCircle/>
+            </template>
+            <template v-else>
+              <PhMinusCircle/>
+            </template>
+          </n-icon>
           <n-button
               quaternary
               v-if="editable"
-              @click="editItem"
-          >
+              @click="editItem">
             <template #icon>
               <n-icon size="20">
                 <PhPencil/>
@@ -200,15 +209,21 @@ onUnmounted(() => {
             </strong>
           </n-button>
           <formatted-plugin-name v-else :name="currentItem.name"/>
+
+          <!-- Иконка статуса после названия -->
+          <span class="status-icon"
+                :class="currentItem.online ? 'online' : 'offline'"
+                v-if="currentItem.name">
+    </span>
         </h4>
         <button
             v-if="editable"
             class="remove-btn"
-            @click="handleRemove"
-        >
+            @click="handleRemove">
           ×
         </button>
       </div>
+
 
       <div class="widget-content">
         <div class="main-display">

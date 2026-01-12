@@ -16,6 +16,7 @@ class Device(Base):
     device_id: Mapped[str] = mapped_column(unique=True, nullable=False)  # Технический ID
     name: Mapped[str] = mapped_column(nullable=False)  # Пользовательское имя
     description: Mapped[Optional[str]] = mapped_column(Text)  # Доп. описание
+    online: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         default=datetime.now(), onupdate=datetime.now(), nullable=False

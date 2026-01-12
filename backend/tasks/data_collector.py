@@ -12,7 +12,7 @@ from core.settings import settings
 from crud.sensor import DeviceDataCRUD
 from models import DeviceData, Device
 from plugins.template import DevicePlugin
-from schemas.sensor import SensorMessage
+from schemas.sensor import SensorMessage, DeviceUpdateSchema
 from services.mqtt_client import AsyncMQTTClient
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ class DataCollector:
 
                 # Спать только если данных не было
                 if not data_received:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(1)
 
                 # Проверяем, пора ли записать batch в БД
                 now = asyncio.get_event_loop().time()
@@ -175,6 +175,13 @@ class DataCollector:
                     device = Device(device_id=msg.device_id, name=msg.device_id)
                     self.db_session.add(device)
                     devices[msg.device_id] = device
+                else:
+                    updated_online = DeviceUpdateSchema(
+                        device_id=msg.device_id, online=msg.online
+                    )
+                    await DeviceDataCRUD.update(
+                        data=updated_online, session=self.db_session
+                    )
 
                 # Проверяем изменение данных
                 last_data = last_data_map.get(msg.device_id)

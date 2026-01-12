@@ -26,29 +26,29 @@ class DS18B20MuxPluginExample(DevicePlugin):
         self.num_sensors = num_sensors
         self.base_temp = base_temp
         self.temp_variation = temp_variation
-        self.sensor_states = {}
+        self.sensor_onlines = {}
 
     async def init_hardware(self):
         logger.info(
             f"Инициализация виртуального мультиплексора для {self.num_sensors} датчиков"
         )
         for i in range(self.num_sensors):
-            self.sensor_states[i] = {"online": True, "last_temp": self.base_temp}
+            self.sensor_onlines[i] = {"online": True, "last_temp": self.base_temp}
         logger.info("Virtual hardware is ready")
 
     async def read_data(self) -> Dict[str, Any]:
-        data = {"unit": "celsius"}
+        data = {"unit": "celsius", "online": True}
 
         for sensor_id in range(self.num_sensors):
-            if self.sensor_states[sensor_id]["online"]:
+            if self.sensor_onlines[sensor_id]["online"]:
                 # Получаем текущее время для расчёта динамики
                 now = time.time()
 
                 # Если последнее обновление было недавно — используем плавное изменение
-                if (now - self.sensor_states[sensor_id].get("last_update", 0)) < 60:
+                if (now - self.sensor_onlines[sensor_id].get("last_update", 0)) < 60:
                     # Плавное колебание ±0.2°C от последнего значения
                     temp_change = random.uniform(-0.2, 0.2)
-                    temp = self.sensor_states[sensor_id]["last_temp"] + temp_change
+                    temp = self.sensor_onlines[sensor_id]["last_temp"] + temp_change
                 else:
                     # Раз в 1–3 минуты имитируем небольшое изменение из-за внешних факторов
                     temp_change = random.uniform(-0.5, 1.0)
@@ -67,8 +67,8 @@ class DS18B20MuxPluginExample(DevicePlugin):
                 temp = round(temp, 1)
 
                 # Сохраняем значение и время обновления
-                self.sensor_states[sensor_id]["last_temp"] = temp
-                self.sensor_states[sensor_id]["last_update"] = now
+                self.sensor_onlines[sensor_id]["last_temp"] = temp
+                self.sensor_onlines[sensor_id]["last_update"] = now
 
                 data[f"sensor_{sensor_id}"] = temp
             else:
@@ -80,13 +80,13 @@ class DS18B20MuxPluginExample(DevicePlugin):
         action = command.get("action")
         if action == "set_offline":
             sensor = command.get("sensor")
-            if sensor in self.sensor_states:
-                self.sensor_states[sensor]["online"] = False
+            if sensor in self.sensor_onlines:
+                self.sensor_onlines[sensor]["online"] = False
                 logger.info(f"Sensor {sensor} switched offline")
         elif action == "set_online":
             sensor = command.get("sensor")
-            if sensor in self.sensor_states:
-                self.sensor_states[sensor]["online"] = True
+            if sensor in self.sensor_onlines:
+                self.sensor_onlines[sensor]["online"] = True
                 logger.info(f"Sensor {sensor} has been transferred online")
         elif action == "set_base_temp":
             new_temp = command.get("temp")

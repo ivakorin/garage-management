@@ -70,16 +70,30 @@ class AsyncMQTTClient:
                     # Обработка сообщений
                     async for message in self.client.messages:
                         topic = str(message.topic)
+                        qos = message.qos
+                        properties = message.properties
+
+                        logger.debug(f"Received MQTT message: topic={topic}, qos={qos}")
+
+                        # Декодируем payload
                         try:
-                            payload = json.loads(message.payload.decode())
+                            payload_dict = json.loads(message.payload.decode())
+                            payload_bytes = message.payload
                         except json.JSONDecodeError:
                             logger.warning(f"Invalid JSON in message: {message.payload}")
-                            continue
+                            payload_dict = None
+                            payload_bytes = message.payload
 
+                        # Поиск и вызов callback (этот блок должен быть ПОСЛЕ try/except!)
                         for subscribed_topic, callback in self.subscriptions.items():
-                            if subscribed_topic == topic:
+                            if self._topic_matches(subscribed_topic, topic):
                                 try:
-                                    asyncio.create_task(callback(payload))
+                                    await callback(
+                                        topic=topic,
+                                        payload=payload_bytes,
+                                        qos=qos,
+                                        properties=properties,
+                                    )
                                 except Exception as e:
                                     logger.error(
                                         f"Error in callback for {topic}: {e}",
@@ -124,7 +138,7 @@ class AsyncMQTTClient:
             logger.error(f"Unexpected error when publishing {topic}: {e}", exc_info=True)
             return False
 
-    def subscribe(self, topic: str, callback: Callable):
+    async def subscribe(self, topic: str, callback: Callable):
         """Регистрирует callback для топика."""
         self.subscriptions[topic] = callback
         logger.debug(f"Subscription is registered: {topic}")
@@ -160,3 +174,15 @@ class AsyncMQTTClient:
     @property
     def is_connected(self):
         return self._is_connected
+
+    def _topic_matches(self, pattern: str, topic: str) -> bool:
+        """Проверяет соответствие топика шаблону с MQTT-wildcard."""
+        import fnmatch
+
+        pattern = pattern.replace("#", "**").replace("+", "*")
+
+        if pattern.endswith("**"):
+            prefix = pattern[:-2]
+            return topic.startswith(prefix)
+
+        return fnmatch.fnmatch(topic, pattern)

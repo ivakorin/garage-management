@@ -37,6 +37,13 @@ class CCS811AirQualityPlugin(DevicePlugin):
         """
         Generates realistic TVOC readings with smooth dynamics and real-life factors.
         """
+        result = {
+            "TVOC": None,
+            "unit": "μg/m³",
+            "status": None,
+            "recent_peaks": None,
+            "online": False,
+        }
         now = datetime.now()
 
         # Significant change every 3–8 minutes
@@ -85,13 +92,11 @@ class CCS811AirQualityPlugin(DevicePlugin):
 
         # Round to 1 decimal place
         tvoc = round(self.current_tvoc, 1)
-
-        return {
-            "TVOC": tvoc,
-            "unit": "μg/m³",
-            "status": self._get_status(tvoc),
-            "recent_peaks": [round(p[1], 1) for p in self.peak_history],  # last 10 peaks
-        }
+        result["TVOC"] = tvoc
+        result["status"] = self._get_status(tvoc)
+        result["recent_peaks"] = [round(p[1], 1) for p in self.peak_history]
+        result["online"] = True
+        return result
 
     def _get_status(self, tvoc: float) -> str:
         """
