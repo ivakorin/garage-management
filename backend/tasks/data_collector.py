@@ -176,8 +176,11 @@ class DataCollector:
                     self.db_session.add(device)
                     devices[msg.device_id] = device
                 else:
+                    logger.debug(f"Device ID: {msg.device_id}, Online: {msg.online}")
                     updated_online = DeviceUpdateSchema(
-                        device_id=msg.device_id, online=msg.online
+                        device_id=msg.device_id,
+                        online=msg.online,
+                        updated_at=datetime.now(),
                     )
                     await DeviceDataCRUD.update(
                         data=updated_online, session=self.db_session
@@ -299,12 +302,14 @@ class DataCollector:
         max_retries = 2
         for attempt in range(max_retries + 1):
             try:
-                topic = f"devices/{message.device_id}/data"
+                topic = f"gm/{message.device_id}/data"
                 payload = json.dumps(message.data)
-
+                await self.mqtt_client.publish(topic, payload, qos=1)
+                topic = f"gm/{message.device_id}/online"
+                payload = json.dumps(message.online)
                 await self.mqtt_client.publish(topic, payload, qos=1)
                 logger.debug(f"Sent to MQTT: {topic} → {payload}")
-                return  # Успешно отправили — выходим
+                return
 
             except (ConnectionError, OSError) as e:
                 logger.warning(f"MQTT error (attempt {attempt + 1}): {e}")

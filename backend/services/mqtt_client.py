@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Any
 
 import aiomqtt
 
@@ -118,7 +118,7 @@ class AsyncMQTTClient:
                         pass
 
     async def publish(
-        self, topic: str, payload: dict, qos: int = 0, retain: bool = False
+        self, topic: str, payload: Any, qos: int = 0, retain: bool = False
     ) -> bool:
         """Публикует сообщение. Возвращает True при успехе."""
         if not self._is_connected or not self.client:
