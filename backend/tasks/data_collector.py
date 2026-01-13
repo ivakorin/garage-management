@@ -168,7 +168,6 @@ class DataCollector:
             to_cleanup: set = (
                 set()
             )  # Устройства, для которых нужно почистить старые записи
-
             for msg in messages:
                 # Создаём устройство, если его нет
                 if msg.device_id not in devices:
@@ -176,7 +175,9 @@ class DataCollector:
                     self.db_session.add(device)
                     devices[msg.device_id] = device
                 else:
-                    logger.debug(f"Device ID: {msg.device_id}, Online: {msg.online}")
+                    logger.debug(
+                        f"State of device - Device ID: {msg.device_id}, Online: {msg.online}"
+                    )
                     updated_online = DeviceUpdateSchema(
                         device_id=msg.device_id,
                         online=msg.online,

@@ -9,14 +9,11 @@ class SQLiteOpFilter(logging.Filter):
 
 logging.basicConfig(
     level=settings.log.level,
-    format="%(levelname)s:\t%(asctime)s\t%(message)s"
-)
+    format="%(asctime)s [%(levelname)s]   component=%(name)s line=%(lineno)d %(message)s")
 
 logging.getLogger().addFilter(SQLiteOpFilter())
 
-logging.getLogger('sqlite3').setLevel(logging.WARNING)
-logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
-logging.getLogger('sqlalchemy.dialects.sqlite').setLevel(logging.WARNING)
+logging.getLogger('aiosqlite').setLevel(logging.WARNING)
 
 
 log = logging.getLogger(__name__)
