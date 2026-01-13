@@ -303,6 +303,8 @@ class DataCollector:
         max_retries = 2
         for attempt in range(max_retries + 1):
             try:
+                if message.data.get("online"):
+                    del message.data["online"]
                 topic = f"gm/{message.device_id}/data"
                 payload = json.dumps(message.data)
                 await self.mqtt_client.publish(topic, payload, qos=1)
