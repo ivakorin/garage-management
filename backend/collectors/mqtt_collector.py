@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Optional
 
 import redis.asyncio as redis
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.settings import settings
 from crud.sensor import DeviceDataCRUD
@@ -33,12 +32,9 @@ class MQTTCollector(BaseCollector):
         self,
         mqtt_client: Optional[AsyncMQTTClient] = None,
         redis_client: Optional[redis.Redis] = None,
-        db_session: Optional[AsyncSession] = None,
         subscription_topics: Optional[list[str]] = None,
     ):
-        super().__init__(
-            mqtt_client=mqtt_client, redis_client=redis_client, db_session=db_session
-        )
+        super().__init__(mqtt_client=mqtt_client, redis_client=redis_client)
         self.subscription_topics = subscription_topics or ["devices/#"]
 
     async def collect(self):

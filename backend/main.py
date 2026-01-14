@@ -12,6 +12,7 @@ from api.api_v1 import router
 from collectors.data_collector import DataCollector
 from collectors.mqtt_collector import MQTTCollector
 from core.settings import settings
+from crud.sensor import DeviceDataCRUD
 from db.database import init_db, async_session_context
 from models import *  # noqa
 from services.mqtt_client import AsyncMQTTClient
@@ -36,10 +37,10 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("Database initialized")
         async with async_session_context() as db_session:
+            await DeviceDataCRUD.drop_state(db_session)
             loaded_plugins = await load_plugins(db_session)
             plugins.clear()
             plugins.update(loaded_plugins)
-            active_db_session = db_session
 
         plugins_list = list(plugins.values())
         redis_client = redis.Redis(
@@ -50,14 +51,12 @@ async def lifespan(app: FastAPI):
         mqtt_client = create_mqtt_client()
         data_collector = DataCollector(
             plugins=plugins_list,
-            db_session=active_db_session,
             redis_client=redis_client,
             mqtt_client=mqtt_client,
         )
         mqtt_collector = MQTTCollector(
             mqtt_client=mqtt_client,
             redis_client=redis_client,
-            db_session=active_db_session,
             subscription_topics=["devices/#"],
         )
         collect_tasks = [

@@ -5,6 +5,7 @@ from typing import Optional
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from db.database import engine
 from services.mqtt_client import AsyncMQTTClient
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class BaseCollector:
         """
         self.mqtt_client = mqtt_client
         self.redis_client = redis_client
-        self.db_session = db_session
+        self.db_session = db_session or AsyncSession(bind=engine)
         self._is_running = False
 
     async def collect(self):

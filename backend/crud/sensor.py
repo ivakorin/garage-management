@@ -37,6 +37,31 @@ class DeviceDataCRUD:
             raise HTTPException(status_code=400, detail="Failed to update device") from e
 
     @staticmethod
+    async def drop_state(session: AsyncSession) -> None:
+        try:
+            stmt = update(Device).values(online=False)
+            await session.execute(stmt)
+            await session.commit()
+            logger.info("All devices set to offline successfully")
+
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error dropping state: {e}", exc_info=True)
+
+    @staticmethod
+    async def _update_core(data: DeviceUpdateSchema, session: AsyncSession):
+        """
+        Базовая логика обновления — без commit/rollback.
+        Используется в batch-операциях.
+        """
+        update_stmt = (
+            update(Device)
+            .where(Device.device_id == data.device_id)
+            .values(data.model_dump(exclude_defaults=True, exclude_none=True))
+        )
+        await session.execute(update_stmt)
+
+    @staticmethod
     async def cleanup_old_data(
         session: AsyncSession, device_id: str, retention_days: int
     ):

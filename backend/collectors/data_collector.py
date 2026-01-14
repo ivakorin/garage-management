@@ -3,7 +3,6 @@ import logging
 from typing import List, Dict, Optional
 
 import redis.asyncio as redis
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.settings import settings
 from plugins.template import DevicePlugin
@@ -26,7 +25,6 @@ class DataCollector(BaseCollector):
     def __init__(
         self,
         plugins: List[DevicePlugin],
-        db_session: AsyncSession,
         redis_client: Optional[redis.Redis] = None,
         mqtt_client: Optional[AsyncMQTTClient] = None,
     ):
@@ -36,9 +34,7 @@ class DataCollector(BaseCollector):
         :param redis_client: клиент Redis (может быть None)
         :param mqtt_client: клиент MQTT (может быть None)
         """
-        super().__init__(
-            mqtt_client=mqtt_client, redis_client=redis_client, db_session=db_session
-        )
+        super().__init__(mqtt_client=mqtt_client, redis_client=redis_client)
         self.plugins = plugins
         self._last_data_cache: Dict[str, Dict] = {}
         self._batch: List[SensorMessage] = []

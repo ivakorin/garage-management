@@ -59,7 +59,7 @@ async def save_batch_to_db(
                     online=msg.online,
                     updated_at=datetime.now(),
                 )
-                await DeviceDataCRUD.update(data=updated_online, session=db_session)
+                await DeviceDataCRUD._update_core(data=updated_online, session=db_session)
             last_data = last_data_map.get(msg.device_id)
             if _is_data_changed(last_data, msg.data):
                 to_cleanup.add(msg.device_id)
