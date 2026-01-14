@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {onMounted, onUnmounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref} from 'vue'
 import type {Widget} from '../composables/useDraggableWidgets'
 import FormattedPluginName from './FormattedPluginName.vue'
 import {PhCheckCircle, PhMinusCircle, PhPencil} from '@phosphor-icons/vue'
@@ -7,7 +7,8 @@ import EditDevice from '../dialogs/editDevice.vue'
 import {readDeviceAPI} from '../api/devices.ts'
 import type {SensorDataReadType, SensorsType} from '../../types/sensors.ts'
 import {SensorWebSocket} from '../ws/webSocket.ts'
-import SensorHistoryChart from "../dialogs/SensorHistoryChart.vue";
+import SensorHistoryChart from "../dialogs/SensorHistoryChart.vue"
+
 
 interface Props {
   data: Widget
@@ -44,6 +45,39 @@ const showDetails = ref<boolean>(false)
 const showHistory = ref<boolean>(false)
 
 let ws: SensorWebSocket | null = null
+
+// 1. Реактивное хранилище для символов единиц
+const unitSymbols = ref<Record<string, string>>({})
+
+// 2. Загрузка JSON при монтировании
+onMounted(async () => {
+  try {
+    // Путь к JSON (убедитесь, что он корректен для вашего окружения)
+    const response = await fetch('/src/misc/measure_units/units.json')
+    if (!response.ok) {
+      throw new Error('Не удалось загрузить units.json')
+    }
+    unitSymbols.value = await response.json()
+  } catch (error) {
+    console.error('Ошибка загрузки units.json:', error)
+  }
+
+  try {
+    currentItem.value = await loadItem()
+    contentLoading.value = false
+  } catch (error) {
+    console.error('Failed to load item:', error)
+  }
+})
+
+// 3. Вычисляемое свойство: подставляем символ для единицы
+const displayedUnit = computed((): string => {
+  const unitKey = sensorData.value?.unit
+  if (!unitKey) return ''
+
+  // Ищем символ в JSON, если не нашли — возвращаем исходную единицу
+  return unitSymbols.value[unitKey] || unitKey
+})
 
 const loadItem = async (): Promise<SensorsType> => {
   const response = await readDeviceAPI(props.data.device_id)
@@ -147,15 +181,6 @@ const openHistory = () => {
   showHistory.value = true
 }
 
-onMounted(async () => {
-  try {
-    currentItem.value = await loadItem()
-    contentLoading.value = false
-  } catch (error) {
-    console.error('Failed to load item:', error)
-  }
-})
-
 onUnmounted(() => {
   if (ws) {
     ws.disconnect()
@@ -167,6 +192,7 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', onResizeMouseup)
 })
 </script>
+
 <template>
   <div
       class="widget"
@@ -209,8 +235,6 @@ onUnmounted(() => {
             </strong>
           </n-button>
           <formatted-plugin-name v-else :name="currentItem.name"/>
-
-          <!-- Иконка статуса после названия -->
           <span class="status-icon"
                 :class="currentItem.online ? 'online' : 'offline'"
                 v-if="currentItem.name">
@@ -228,7 +252,7 @@ onUnmounted(() => {
       <div class="widget-content">
         <div class="main-display">
           <div class="value">{{ sensorData?.value?.toFixed(2) || '—' }}</div>
-          <div v-if="sensorData?.unit" class="unit">{{ sensorData.unit }}</div>
+          <div v-if="displayedUnit" class="unit">{{ displayedUnit }}</div>
         </div>
         <n-space>
           <n-button

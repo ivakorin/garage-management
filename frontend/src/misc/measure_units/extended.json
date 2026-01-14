@@ -1,0 +1,151 @@
+{
+  "temperature": {
+    "celsius": "°C",
+    "kelvin": "K",
+    "fahrenheit": "°F"
+  },
+  "electricity": {
+    "volts": "V",
+    "millivolts": "mV",
+    "kilovolts": "kV",
+    "microvolts": "µV",
+    "amperes": "A",
+    "milliamperes": "mA",
+    "microamperes": "µA",
+    "kiloamperes": "kA",
+    "ohms": "Ω",
+    "kilohms": "kΩ",
+    "megohms": "MΩ",
+    "watts": "W",
+    "milliwatts": "mW",
+    "kilowatts": "kW",
+    "megawatts": "MW",
+    "volt-amperes": "VA",
+    "var": "var",
+    "farads": "F",
+    "microfarads": "µF",
+    "picofarads": "pF",
+    "henrys": "H",
+    "millihenrys": "mH",
+    "siemens": "S",
+    "coulombs": "C",
+    "ampere-hour": "A·h",
+    "milliampere-hour": "mA·h"
+  },
+  "frequency_and_time": {
+    "hertz": "Hz",
+    "kilohertz": "kHz",
+    "megahertz": "MHz",
+    "gigahertz": "GHz",
+    "seconds": "s",
+    "milliseconds": "ms",
+    "microseconds": "µs",
+    "minutes": "min",
+    "hours": "h",
+    "days": "d"
+  },
+  "length_and_area": {
+    "meters": "m",
+    "centimeters": "cm",
+    "millimeters": "mm",
+    "kilometers": "km",
+    "inches": "in",
+    "feet": "ft",
+    "yards": "yd",
+    "miles": "mi",
+    "square meters": "m²",
+    "square kilometers": "km²",
+    "hectares": "ha",
+    "acres": "ac"
+  },
+  "volume": {
+    "cubic meters": "m³",
+    "liters": "L",
+    "milliliters": "mL",
+    "cubic centimeters": "cm³",
+    "cubic feet": "ft³",
+    "gallons": "gal",
+    "fluid ounces": "fl oz"
+  },
+  "mass": {
+    "kilograms": "kg",
+    "grams": "g",
+    "milligrams": "mg",
+    "micrograms": "µg",
+    "tonnes": "t",
+    "pounds": "lb",
+    "ounces": "oz"
+  },
+  "pressure": {
+    "pascal": "Pa",
+    "kilopascal": "kPa",
+    "megapascal": "MPa",
+    "bar": "bar",
+    "millibar": "mbar",
+    "atmospheres": "atm",
+    "torr": "Torr",
+    "millimeters of mercury": "mmHg",
+    "inches of water": "inH₂O"
+  },
+  "energy_and_power": {
+    "joules": "J",
+    "kilojoules": "kJ",
+    "megajoules": "MJ",
+    "watt-hours": "W·h",
+    "kilowatt-hours": "kW·h",
+    "calories": "cal",
+    "kilocalories": "kcal",
+    "btu": "BTU"
+  },
+  "light_and_radiation": {
+    "lumen": "lm",
+    "lux": "lx",
+    "candela": "cd",
+    "becquerel": "Bq",
+    "gray": "Gy",
+    "sievert": "Sv",
+    "curie": "Ci"
+  },
+  "concentration": {
+    "parts per million": "ppm",
+    "parts per billion": "ppb",
+    "parts per trillion": "ppt",
+    "percent": "%",
+    "moles per liter": "mol/L",
+    "molar": "M",
+    "millimolar": "mM",
+    "micromolar": "µM",
+    "grams per liter": "g/L",
+    "milligrams per liter": "mg/L",
+    "micrograms per liter": "µg/L",
+    "grams per cubic meter": "g/m³",
+    "milligrams per cubic meter": "mg/m³"
+  },
+  "speed_and_flow": {
+    "meters per second": "m/s",
+    "kilometers per hour": "km/h",
+    "miles per hour": "mph",
+    "liters per minute": "L/min",
+    "cubic meters per hour": "m³/h",
+    "gallons per minute": "gpm"
+  },
+  "angles": {
+    "radians": "rad",
+    "degrees": "°",
+    "steradians": "sr"
+  },
+  "misc": {
+    "counts per second": "cps",
+    "revolutions per minute": "rpm",
+    "beats per minute": "bpm",
+    "decibels": "dB",
+    "ph": "pH",
+    "specific gravity": "SG",
+    "viscosity in poise": "P",
+    "kinematic viscosity in stokes": "St",
+    "conductivity in siemens per meter": "S/m",
+    "resistivity in ohm-meters": "Ω·m",
+    "humidity in percent relative humidity": "% RH",
+    "dew point in celsius": "°C dew point"
+  }
+}
