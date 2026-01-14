@@ -19,7 +19,7 @@ class Trigger(BaseModel):
     type: TriggerType
     sensor_id: Optional[str] = None
     condition: Optional[str] = None
-    time: Optional[str] = None  # формат HH:MM
+    time: Optional[str] = None  # HH:MM
 
 
 class Action(BaseModel):

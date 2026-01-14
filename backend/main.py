@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from typing import List, Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI
@@ -8,12 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from api.api_v1 import router
+from collectors.data_collector import DataCollector
+from collectors.mqtt_collector import MQTTCollector
 from core.settings import settings
 from db.database import init_db, async_session_context
 from models import *  # noqa
+from services.mqtt_client import AsyncMQTTClient
+from services.mqtt_helper import create_mqtt_client
 from services.plugins import load_plugins
-from services.ws_manager import ws_manager
-from tasks.data_collector import DataCollector
 from utils.automations import automations_loader
 
 logging.basicConfig(level=settings.log.level)
@@ -25,44 +28,71 @@ plugins = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    collect_task = None
-    redis_client = None
+    collect_tasks: List[asyncio.Task] = []
+    redis_client: Optional[redis.Redis] = None
+    mqtt_client: Optional[AsyncMQTTClient] = None
+
     try:
         await init_db()
         logger.info("Database initialized")
-        # await ws_manager.startup()
         async with async_session_context() as db_session:
             loaded_plugins = await load_plugins(db_session)
             plugins.clear()
             plugins.update(loaded_plugins)
             active_db_session = db_session
+
         plugins_list = list(plugins.values())
         redis_client = redis.Redis(
             host=settings.redis.host,
             port=settings.redis.port,
             db=settings.redis.db,
         )
+        mqtt_client = create_mqtt_client()
         data_collector = DataCollector(
-            plugins=plugins_list, db_session=active_db_session, redis_client=redis_client
+            plugins=plugins_list,
+            db_session=active_db_session,
+            redis_client=redis_client,
+            mqtt_client=mqtt_client,
         )
-        collect_task = asyncio.create_task(data_collector.collect())
-        logger.info("DataCollector task created")
+        mqtt_collector = MQTTCollector(
+            mqtt_client=mqtt_client,
+            redis_client=redis_client,
+            db_session=active_db_session,
+            subscription_topics=["devices/#"],
+        )
+        collect_tasks = [
+            asyncio.create_task(data_collector.collect()),
+            asyncio.create_task(mqtt_collector.collect()),
+        ]
+        logger.info("DataCollector and MQTTCollector tasks created")
         await automations_loader("./automations")
+
         yield
 
     except Exception as e:
         logger.error(f"Lifespan error: {e}", exc_info=True)
+        raise
+
     finally:
-        if collect_task:
-            collect_task.cancel()
+        for task in collect_tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        if mqtt_client:
             try:
-                await collect_task
-            except asyncio.CancelledError:
-                pass
+                await mqtt_client.disconnect()
+                logger.info("MQTT client disconnected")
+            except Exception as e:
+                logger.error(f"Error disconnecting MQTT client: {e}")
         if redis_client:
-            await redis_client.close()
-        if ws_manager:
-            await ws_manager.shutdown()
+            try:
+                await redis_client.close()
+                logger.info("Redis client closed")
+            except Exception as e:
+                logger.error(f"Error closing Redis client: {e}")
         logger.info("Application shutdown complete")
 
 
@@ -78,7 +108,6 @@ app = FastAPI(
 origins = [
     "http://localhost",
     "http://localhost:8000",
-    "https://your-domain.com",
 ]
 
 allow_all_origins = True

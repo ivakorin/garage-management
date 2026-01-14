@@ -4,10 +4,10 @@ from typing import Optional
 
 import redis.asyncio as redis
 
+from collectors.data_collector import DataCollector
 from core.settings import settings
 from db.database import async_session_context
 from services.plugins import load_plugins
-from tasks.data_collector import DataCollector
 
 logger = logging.getLogger(__name__)
 

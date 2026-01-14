@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import List
+from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import delete, select, and_, func, update
@@ -132,6 +132,20 @@ class DeviceDataCRUD:
         device_dict["timestamp"] = device_data.timestamp if device_data else None
         device_dict["value"] = device_data.value if device_data else None
         return DeviceReadSchema.model_validate(device_dict, from_attributes=True)
+
+    @staticmethod
+    async def search(pattern: str, session: AsyncSession) -> Optional[List[str]]:
+        stmt = select(Device.device_id).where(Device.device_id.like(f"%{pattern}%"))
+        try:
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            if rows:
+                return list(rows)
+            return []
+
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error fetching devices: {e}")
 
     @staticmethod
     async def get_history(
