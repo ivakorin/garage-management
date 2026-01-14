@@ -185,6 +185,7 @@ function updateChartOption() {
         {
           name: 'Sensor Data',
           type: 'line',
+          showSymbol: false,
           data: processedData.map(d => [d.timestamp, d.value]),
           lineStyle: {width: 2},
           smooth: true
