@@ -8,6 +8,11 @@ import {readDeviceAPI} from '../api/devices.ts'
 import type {SensorDataReadType, SensorsType} from '../../types/sensors.ts'
 import {SensorWebSocket} from '../ws/webSocket.ts'
 import SensorHistoryChart from "../dialogs/SensorHistoryChart.vue"
+import unitSymbolsJson from '../misc/measure_units/units.json';
+
+onMounted(() => {
+  unitSymbols.value = unitSymbolsJson;
+});
 
 
 interface Props {
@@ -51,16 +56,8 @@ const unitSymbols = ref<Record<string, string>>({})
 
 // 2. Загрузка JSON при монтировании
 onMounted(async () => {
-  try {
-    // Путь к JSON (убедитесь, что он корректен для вашего окружения)
-    const response = await fetch('/src/misc/measure_units/units.json')
-    if (!response.ok) {
-      throw new Error('Не удалось загрузить units.json')
-    }
-    unitSymbols.value = await response.json()
-  } catch (error) {
-    console.error('Ошибка загрузки units.json:', error)
-  }
+
+  unitSymbols.value = unitSymbolsJson;
 
   try {
     currentItem.value = await loadItem()
