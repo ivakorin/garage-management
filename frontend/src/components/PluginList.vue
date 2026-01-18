@@ -5,6 +5,10 @@ import type {PluginsType} from "../../types/plugins.ts";
 import FormattedPluginName from "./FormattedPluginName.vue";
 import type {Widget} from "../composables/useDraggableWidgets.ts";
 import {api} from "../boot/axios.ts";
+import {PhArrowsClockwise} from "@phosphor-icons/vue";
+import {useMessage} from "naive-ui";
+
+const message = useMessage()
 
 const plugins = ref<PluginsType[]>([])
 const loadPlugins = async () => {
@@ -45,12 +49,35 @@ const updatePlugin = (id: number, is_running: boolean) => {
   })
 }
 
+const ReloadPlugins = () => {
+  api.post('plugins/reload').then(response => {
+        plugins.value = []
+        loadPlugins()
+        message.success(response.data.message)
+      }
+  )
+}
+
 loadPlugins()
 </script>
 
 <template>
   <div class="plugin-list">
-    <h3>Plugins</h3>
+    <div>
+      <h3>Plugins</h3>
+      <n-tooltip trigger="hover">
+        <template #trigger>
+          <n-button tertiary circle type="primary" @click="ReloadPlugins">
+            <template #icon>
+              <n-icon>
+                <PhArrowsClockwise/>
+              </n-icon>
+            </template>
+          </n-button>
+        </template>
+        Reload plugins
+      </n-tooltip>
+    </div>
     <n-grid
         v-for="plugin in plugins"
         :key="plugin.id"

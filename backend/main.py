@@ -137,7 +137,7 @@ def custom_openapi():
         description=app.description,
         routes=app.routes,
     )
-    # Добавляем описание WebSocket
+    openapi_schema["openapi"] = "3.0.0"
     openapi_schema["paths"]["/api/v1/ws"] = {
         "get": {
             "summary": "WebSocket Endpoint",

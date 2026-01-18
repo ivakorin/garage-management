@@ -173,6 +173,17 @@ class DeviceDataCRUD:
             logger.error(f"Error fetching devices: {e}")
 
     @staticmethod
+    async def get_av_value(measure_unit: str, session: AsyncSession) -> Optional[float]:
+        stmt = select(func.avg(DeviceData.value)).where(DeviceData.unit == measure_unit)
+        try:
+            result = await session.execute(stmt)
+            data = result.scalar()
+            return float(data) if data else None
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error fetching av value: {e}")
+
+    @staticmethod
     async def get_history(
         session: AsyncSession,
         device_id: str,

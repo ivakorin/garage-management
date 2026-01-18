@@ -7,6 +7,7 @@ import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+
 # Импорт профилировщика
 from pyinstrument import Profiler
 

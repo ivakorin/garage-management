@@ -28,6 +28,13 @@ async def get_sensor(device_id: str, session: AsyncSession = Depends(get_async_s
     return await DeviceDataCRUD.get(device_id=device_id, session=session)
 
 
+@router.get("/get/avg_value/{measure_unit}", response_model=float)
+async def get_avg_value(
+    measure_unit: str, session: AsyncSession = Depends(get_async_session)
+):
+    return await DeviceDataCRUD.get_av_value(session=session, measure_unit=measure_unit)
+
+
 @router.patch("/update", response_model=DeviceReadSchema)
 async def update_sensor(
     sensor: DeviceUpdateSchema, session: AsyncSession = Depends(get_async_session)

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 
 from crud.plugins import Plugins
 from db.database import get_async_session
+from schemas.common import CommonResponse
 from schemas.plugins import PluginReadShema, PluginUpdateSchema
 from utils.collector import restart_collector
 
@@ -14,6 +15,12 @@ router = APIRouter(prefix="/plugins", tags=["Plugins"])
 @router.get("/get", response_model=List[PluginReadShema])
 async def list_plugins(session=Depends(get_async_session)):
     return await Plugins.get_all(session)
+
+
+@router.post("/reload", response_model=CommonResponse)
+async def reload_plugins():
+    await restart_collector()
+    return CommonResponse(success=True, message="Plugins reload successful")
 
 
 @router.patch("/update/", response_model=PluginReadShema)
