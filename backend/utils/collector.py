@@ -38,7 +38,6 @@ async def restart_collector():
         loaded_plugins = await load_plugins(db_session)
         plugins.clear()
         plugins.update(loaded_plugins)
-        active_db_session = db_session
 
     plugins_list = list(plugins.values())
 

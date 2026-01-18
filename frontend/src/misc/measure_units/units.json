@@ -120,6 +120,6 @@
   "kinematic_viscosity_in_stokes": "St",
   "conductivity_in_siemens_per_meter": "S/m",
   "resistivity_in_ohm-meters": "Ω·m",
-  "humidity_in_percent_relative_humidity": "% RH",
+  "humidity": "% RH",
   "dew_point_in_celsius": "°C dew point"
 }
