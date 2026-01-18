@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ async def get_sensor(device_id: str, session: AsyncSession = Depends(get_async_s
     return await DeviceDataCRUD.get(device_id=device_id, session=session)
 
 
-@router.get("/get/avg_value/{measure_unit}", response_model=float)
+@router.get("/get/avg_value/{measure_unit}", response_model=Optional[float])
 async def get_avg_value(
     measure_unit: str, session: AsyncSession = Depends(get_async_session)
 ):
