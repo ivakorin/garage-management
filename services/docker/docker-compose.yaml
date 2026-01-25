@@ -13,6 +13,8 @@ services:
       - GM__MQTT__PASSWORD=${GM__MQTT__PASSWORD}
       - GM__APP_SETTINGS__KEEP_DATA=${GM__APP_SETTINGS__KEEP_DATA}
       - GM__LOG__LEVEL=${GM__LOG__LEVEL}
+      - GM__COLLECTOR__MQTT=${GM__COLLECTOR__MQTT}
+      - GM__COLLECTOR__PLUGINS=${GM__COLLECTOR__PLUGINS}
     volumes:
       - ./base:/app/db/base
       - ./plugins:/app/plugins
