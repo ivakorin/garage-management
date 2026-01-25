@@ -14,6 +14,11 @@ class Database(BaseSettings):
         return f"sqlite+aiosqlite:///{self.patch}"
 
 
+class Collector(BaseSettings):
+    mqtt: bool = True
+    plugins: bool = True
+
+
 class Redis(BaseSettings):
     host: str
     port: int
@@ -59,6 +64,7 @@ class Settings(BaseSettings):
     log: Log
     mqtt: MQTT
     app_settings: AppSettings
+    collector: Collector
 
 
 settings = Settings()

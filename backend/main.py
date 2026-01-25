@@ -60,8 +60,16 @@ async def lifespan(app: FastAPI):
             subscription_topics=["devices/#"],
         )
         collect_tasks = [
-            asyncio.create_task(data_collector.collect()),
-            asyncio.create_task(mqtt_collector.collect()),
+            (
+                asyncio.create_task(data_collector.collect())
+                if settings.collector.plugins
+                else None
+            ),
+            (
+                asyncio.create_task(mqtt_collector.collect())
+                if settings.collector.mqtt
+                else None
+            ),
         ]
         logger.info("DataCollector and MQTTCollector tasks created")
         await automations_loader("./automations")
@@ -74,7 +82,7 @@ async def lifespan(app: FastAPI):
 
     finally:
         for task in collect_tasks:
-            if not task.done():
+            if task and not task.done():
                 task.cancel()
                 try:
                     await task
