@@ -192,7 +192,10 @@ class DeviceDataCRUD:
         )
         try:
             result = await session.execute(stmt)
-            return float(result.scalar()) if result else None
+            result = result.scalar()
+            if result:
+                return float(result)
+            return None
         except Exception as e:
             await session.rollback()
             logger.error(f"Error fetching value: {e}")
