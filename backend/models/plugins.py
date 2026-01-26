@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime
 
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.database import Base
+
+logger = logging.getLogger(__name__)
 
 
 class PluginRegistry(Base):

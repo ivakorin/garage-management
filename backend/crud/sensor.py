@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import delete, select, and_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import DeviceData, Device
+from models import SensorData, Sensor
 from schemas.sensor import DeviceReadSchema, DeviceUpdateSchema, DeviceDataReadSchema
 
 logger = logging.getLogger(__name__)
@@ -18,8 +18,8 @@ class DeviceDataCRUD:
     async def update(data: DeviceUpdateSchema, session: AsyncSession) -> DeviceReadSchema:
         try:
             update_stmt = (
-                update(Device)
-                .where(Device.device_id == data.device_id)
+                update(Sensor)
+                .where(Sensor.device_id == data.device_id)
                 .values(
                     data.model_dump(
                         exclude_defaults=True, exclude_none=True, exclude_unset=True
@@ -39,7 +39,7 @@ class DeviceDataCRUD:
     @staticmethod
     async def drop_state(session: AsyncSession) -> None:
         try:
-            stmt = update(Device).values(online=False)
+            stmt = update(Sensor).values(online=False)
             await session.execute(stmt)
             await session.commit()
             logger.info("All devices set to offline successfully")
@@ -55,8 +55,8 @@ class DeviceDataCRUD:
         Используется в batch-операциях.
         """
         update_stmt = (
-            update(Device)
-            .where(Device.device_id == data.device_id)
+            update(Sensor)
+            .where(Sensor.device_id == data.device_id)
             .values(data.model_dump(exclude_defaults=True, exclude_none=True))
         )
         await session.execute(update_stmt)
@@ -66,8 +66,8 @@ class DeviceDataCRUD:
         session: AsyncSession, device_id: str, retention_days: int
     ):
         cutoff = datetime.datetime.now() - datetime.timedelta(days=retention_days)
-        stmt = delete(DeviceData).where(
-            DeviceData.device_id == device_id, DeviceData.timestamp < cutoff
+        stmt = delete(SensorData).where(
+            SensorData.device_id == device_id, SensorData.timestamp < cutoff
         )
         await session.execute(stmt)
 
@@ -75,23 +75,23 @@ class DeviceDataCRUD:
     async def get_all(session: AsyncSession) -> List[DeviceReadSchema]:
         subq = (
             select(
-                DeviceData.device_id,
-                func.max(DeviceData.timestamp).label("max_timestamp"),
+                SensorData.device_id,
+                func.max(SensorData.timestamp).label("max_timestamp"),
             )
-            .group_by(DeviceData.device_id)
+            .group_by(SensorData.device_id)
             .subquery()
         )
         stmt = (
-            select(Device, DeviceData)
+            select(Sensor, SensorData)
             .join(
-                DeviceData,
+                SensorData,
                 and_(
-                    Device.device_id == DeviceData.device_id,
-                    DeviceData.timestamp == subq.c.max_timestamp,
+                    Sensor.device_id == SensorData.device_id,
+                    SensorData.timestamp == subq.c.max_timestamp,
                 ),
             )
-            .outerjoin(subq, DeviceData.device_id == subq.c.device_id)
-            .order_by(Device.created_at.desc())
+            .outerjoin(subq, SensorData.device_id == subq.c.device_id)
+            .order_by(Sensor.created_at.desc())
         )
 
         try:
@@ -123,26 +123,26 @@ class DeviceDataCRUD:
     async def get(device_id: str, session: AsyncSession) -> DeviceReadSchema:
         subq = (
             select(
-                DeviceData.device_id,
-                DeviceData.value,
-                func.max(DeviceData.timestamp).label("max_timestamp"),
+                SensorData.device_id,
+                SensorData.value,
+                func.max(SensorData.timestamp).label("max_timestamp"),
             )
-            .group_by(DeviceData.device_id)
+            .group_by(SensorData.device_id)
             .subquery()
         )
 
         stmt = (
-            select(Device, DeviceData)
+            select(Sensor, SensorData)
             .join(
-                DeviceData,
+                SensorData,
                 and_(
-                    Device.device_id == DeviceData.device_id,
-                    DeviceData.timestamp == subq.c.max_timestamp,
+                    Sensor.device_id == SensorData.device_id,
+                    SensorData.timestamp == subq.c.max_timestamp,
                 ),
             )
-            .outerjoin(subq, DeviceData.device_id == subq.c.device_id)
-            .where(Device.device_id == device_id)
-            .order_by(Device.created_at.desc())
+            .outerjoin(subq, SensorData.device_id == subq.c.device_id)
+            .where(Sensor.device_id == device_id)
+            .order_by(Sensor.created_at.desc())
         )
 
         result = await session.execute(stmt)
@@ -160,7 +160,7 @@ class DeviceDataCRUD:
 
     @staticmethod
     async def search(pattern: str, session: AsyncSession) -> Optional[List[str]]:
-        stmt = select(Device.device_id).where(Device.device_id.like(f"%{pattern}%"))
+        stmt = select(Sensor.device_id).where(Sensor.device_id.like(f"%{pattern}%"))
         try:
             result = await session.execute(stmt)
             rows = result.scalars().all()
@@ -174,7 +174,7 @@ class DeviceDataCRUD:
 
     @staticmethod
     async def get_av_value(measure_unit: str, session: AsyncSession) -> Optional[float]:
-        stmt = select(func.avg(DeviceData.value)).where(DeviceData.unit == measure_unit)
+        stmt = select(func.avg(SensorData.value)).where(SensorData.unit == measure_unit)
         try:
             result = await session.execute(stmt)
             data = result.scalar()
@@ -184,19 +184,33 @@ class DeviceDataCRUD:
             logger.error(f"Error fetching av value: {e}")
 
     @staticmethod
+    async def get_value(device_id: str, session: AsyncSession) -> Optional[float]:
+        stmt = (
+            select(SensorData.value)
+            .where(SensorData.device_id == device_id)
+            .order_by(SensorData.timestamp.desc())
+        )
+        try:
+            result = await session.execute(stmt)
+            return float(result.scalar()) if result else None
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error fetching value: {e}")
+
+    @staticmethod
     async def get_history(
         session: AsyncSession,
         device_id: str,
     ) -> List[DeviceDataReadSchema]:
         stmt = (
             select(
-                DeviceData.device_id,
-                DeviceData.timestamp,
-                DeviceData.value,
-                DeviceData.unit,
+                SensorData.device_id,
+                SensorData.timestamp,
+                SensorData.value,
+                SensorData.unit,
             )
-            .where(DeviceData.device_id == device_id)
-            .order_by(DeviceData.timestamp.desc())
+            .where(SensorData.device_id == device_id)
+            .order_by(SensorData.timestamp.desc())
         )
         try:
             result = await session.execute(stmt)

@@ -75,3 +75,28 @@ class DevicePlugin(ABC):
         """Do not use this method directly from plugins."""
         self.is_running = False
         logger.info(f"The {self.device_id} plugin has been stopped")
+
+
+class ActuatorPlugin(ABC):
+    """Базовый класс для исполнительных устройств (реле, LED, серво и т. п.)."""
+
+    def __init__(self, device_id: str, pin: int, inverted: bool = False):
+        self.device_id = device_id
+        self.pin = pin
+        self.inverted = inverted
+
+    async def init_hardware(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def handle_command(self, command: dict) -> None:
+        """Обрабатывает команды (должен быть реализован)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_state(self) -> dict:
+        """Возвращает текущее состояние (должен быть реализован)."""
+        raise NotImplementedError
+
+    async def cleanup(self):
+        pass

@@ -1,12 +1,12 @@
 automation:
-  id: door-sensor-alert
-  name: "Оповещение при открытии двери"
+  id: complex_air_control
+  name: "Комплексное управление воздухом"
   trigger:
     type: sensor_change
-    sensor_id: garage_door
-    condition: open
+    sensor_id: CSS811_cc989158bdca
+    operator: ">"
+    value: 100
   action:
-    type: send_notification
-    recipient: admin@example.com
-    message: "Дверь гаража открыта!"
+    type: turn_on
+    device_id: test_actuator_4f545a198cb2
   enabled: true

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.settings import settings
 from crud.sensor import DeviceDataCRUD
-from models import Device, DeviceData
+from models import Sensor, SensorData
 from schemas.sensor import SensorMessage, DeviceUpdateSchema
 
 logger = logging.getLogger(__name__)
@@ -34,23 +34,23 @@ async def save_batch_to_db(
     try:
         device_ids = {msg.device_id for msg in messages}
         result = await db_session.execute(
-            select(Device).where(Device.device_id.in_(device_ids))
+            select(Sensor).where(Sensor.device_id.in_(device_ids))
         )
         devices = {dev.device_id: dev for dev in result.scalars().all()}
         last_data_result = await db_session.execute(
-            select(DeviceData)
-            .where(DeviceData.device_id.in_(device_ids))
-            .order_by(DeviceData.timestamp.desc())
+            select(SensorData)
+            .where(SensorData.device_id.in_(device_ids))
+            .order_by(SensorData.timestamp.desc())
         )
         last_data_list = last_data_result.scalars().all()
         last_data_map = {item.device_id: item for item in last_data_list}
 
-        to_insert: List[DeviceData] = []
+        to_insert: List[SensorData] = []
         to_cleanup: set = set()
 
         for msg in messages:
             if msg.device_id not in devices:
-                device = Device(device_id=msg.device_id, name=msg.device_id)
+                device = Sensor(device_id=msg.device_id, name=msg.device_id)
                 db_session.add(device)
                 devices[msg.device_id] = device
             else:
@@ -63,7 +63,7 @@ async def save_batch_to_db(
             last_data = last_data_map.get(msg.device_id)
             if _is_data_changed(last_data, msg.data):
                 to_cleanup.add(msg.device_id)
-                db_data = DeviceData(
+                db_data = SensorData(
                     device_id=msg.device_id,
                     timestamp=datetime.fromisoformat(msg.timestamp),
                     data=json.dumps(msg.data),
@@ -94,7 +94,7 @@ async def save_batch_to_db(
 
 
 def _is_data_changed(
-    last_data: Optional[DeviceData], new_data: dict, cached_data: dict = None
+    last_data: Optional[SensorData], new_data: dict, cached_data: dict = None
 ) -> bool:
     """
     Checks whether the data has changed compared to the last record.
@@ -142,7 +142,7 @@ async def extract_numeric_value(data: dict) -> Optional[float]:
 
 async def get_last_device_data(
     db_session: AsyncSession, device_id: str
-) -> Optional[DeviceData]:
+) -> Optional[SensorData]:
     """
     Gets the latest record for the device from the database.
 
@@ -152,9 +152,9 @@ async def get_last_device_data(
     """
     try:
         result = await db_session.execute(
-            select(DeviceData)
-            .where(DeviceData.device_id == device_id)
-            .order_by(DeviceData.timestamp.desc())
+            select(SensorData)
+            .where(SensorData.device_id == device_id)
+            .order_by(SensorData.timestamp.desc())
             .limit(1)
         )
         return result.scalars().first()

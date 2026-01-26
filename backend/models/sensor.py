@@ -7,10 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from db.database import Base
 
 
-class Device(Base):
+class Sensor(Base):
     """Информация об устройстве (метаданные)."""
 
-    __tablename__ = "devices"
+    __tablename__ = "sensors"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     device_id: Mapped[str] = mapped_column(unique=True, nullable=False)  # Технический ID
@@ -23,13 +23,16 @@ class Device(Base):
     )
 
 
-class DeviceData(Base):
+class SensorData(Base):
     """История данных с устройств."""
 
-    __tablename__ = "device_data"
+    __tablename__ = "sensors_data"
     __table_args__ = (
         Index(
-            "idx_device_id_timestamp", "device_id", "timestamp", postgresql_using="btree"
+            "idx_sensor_device_timestamp",
+            "device_id",
+            "timestamp",
+            postgresql_using="btree",
         ),
     )
     id: Mapped[int] = mapped_column(primary_key=True)

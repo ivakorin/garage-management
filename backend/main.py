@@ -15,10 +15,12 @@ from core.settings import settings
 from crud.sensor import DeviceDataCRUD
 from db.database import init_db, async_session_context
 from models import *  # noqa
+from services.actuator_manager import ActuatorManager
+from services.automations import load_all_automations
 from services.mqtt_client import AsyncMQTTClient
 from services.mqtt_helper import create_mqtt_client
 from services.plugins import load_plugins
-from utils.automations import automations_loader
+from utils.automations import AutomationEngine
 
 logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
@@ -32,15 +34,19 @@ async def lifespan(app: FastAPI):
     collect_tasks: List[asyncio.Task] = []
     redis_client: Optional[redis.Redis] = None
     mqtt_client: Optional[AsyncMQTTClient] = None
+    actuator_manager: Optional[ActuatorManager] = None
 
     try:
         await init_db()
         logger.info("Database initialized")
+
         async with async_session_context() as db_session:
             await DeviceDataCRUD.drop_state(db_session)
             loaded_plugins = await load_plugins(db_session)
             plugins.clear()
             plugins.update(loaded_plugins)
+            actuator_manager = ActuatorManager()
+            await actuator_manager.load_actuators(db_session)
 
         plugins_list = list(plugins.values())
         redis_client = redis.Redis(
@@ -72,7 +78,16 @@ async def lifespan(app: FastAPI):
             ),
         ]
         logger.info("DataCollector and MQTTCollector tasks created")
-        await automations_loader("./automations")
+
+        automations = load_all_automations("./automations")
+        automation_engine = AutomationEngine(
+            redis_client=redis_client,
+            actuator_manager=actuator_manager,
+            automations=automations,
+        )
+        asyncio.create_task(automation_engine.run())
+
+        logger.info("AutomationEngine started")
 
         yield
 
@@ -81,6 +96,9 @@ async def lifespan(app: FastAPI):
         raise
 
     finally:
+        if automation_engine:
+            automation_engine.running = False
+            await automation_engine.cleanup()
         for task in collect_tasks:
             if task and not task.done():
                 task.cancel()
@@ -100,7 +118,13 @@ async def lifespan(app: FastAPI):
                 logger.info("Redis client closed")
             except Exception as e:
                 logger.error(f"Error closing Redis client: {e}")
-        logger.info("Application shutdown complete")
+        if actuator_manager:
+            for actuator in actuator_manager.actuators.values():
+                try:
+                    await actuator.cleanup()
+                except Exception as e:
+                    logger.error(f"Error cleaning up actuator {actuator.device_id}: {e}")
+                    logger.info("Application shutdown complete")
 
 
 app = FastAPI(

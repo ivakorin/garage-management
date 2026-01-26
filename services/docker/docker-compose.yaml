@@ -18,17 +18,20 @@ services:
     volumes:
       - ./base:/app/db/base
       - ./plugins:/app/plugins
+      - ./automations:/app/automations
       - /sys:/sys:rw
       - /dev:/dev
       - /lib/modules:/lib/modules:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     networks:
       - iot-network
     devices:
       - /dev/gpiomem:/dev/gpiomem
       - /dev/i2c-1:/dev/i2c-1
     cap_add:
-      - SYS_ADMIN
-      - DAC_OVERRIDE
+      - CAP_SYS_RAWIO
+    privileged: true
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:80/docs" ]
