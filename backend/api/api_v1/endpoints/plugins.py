@@ -23,7 +23,7 @@ async def reload_plugins():
     return CommonResponse(success=True, message="Plugins reload successful")
 
 
-@router.patch("/update/", response_model=PluginReadSchema)
+@router.patch("/update", response_model=PluginReadSchema)
 async def update_plugin(data: PluginUpdateSchema, session=Depends(get_async_session)):
     data.updated_at = datetime.now()
     result = await Plugins.update(data=data, session=session)
