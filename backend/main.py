@@ -21,6 +21,7 @@ from services.mqtt_client import AsyncMQTTClient
 from services.mqtt_helper import create_mqtt_client
 from services.plugins import load_plugins
 from utils.automations import AutomationEngine
+from utils.dependencies import setup_plugin_dependencies
 
 logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ plugins = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_plugin_dependencies()
     collect_tasks: List[asyncio.Task] = []
     redis_client: Optional[redis.Redis] = None
     mqtt_client: Optional[AsyncMQTTClient] = None
