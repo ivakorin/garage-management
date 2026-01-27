@@ -3,10 +3,10 @@ automation:
   name: "Комплексное управление воздухом"
   trigger:
     type: sensor_change
-    sensor_id: DS18B20_ddd8f64d18e4
+    sensor_id: DS18B20_9ddc30d2d245
     operator: ">"
     value: 10
   action:
     type: turn_on
-    device_id: test_actuator_0300589370e8
+    device_id: test_actuator_a8494b082ac7
   enabled: true

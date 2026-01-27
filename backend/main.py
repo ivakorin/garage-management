@@ -21,7 +21,7 @@ from services.mqtt_client import AsyncMQTTClient
 from services.mqtt_helper import create_mqtt_client
 from services.plugins import load_plugins
 from utils.automations import AutomationEngine
-from utils.dependencies import setup_plugin_dependencies
+from utils.dependencies import setup_plugin_dependencies, set_automation_engine
 
 logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
@@ -88,6 +88,7 @@ async def lifespan(app: FastAPI):
             automations=automations,
         )
         asyncio.create_task(automation_engine.run())
+        set_automation_engine(automation_engine)
 
         logger.info("AutomationEngine started")
 

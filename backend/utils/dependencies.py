@@ -3,6 +3,9 @@ import logging
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
+
+from utils.automations import AutomationEngine
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +81,19 @@ def setup_plugin_dependencies():
 
         except Exception as e:
             logger.error(f"[DEP] Fatal error with {package}: {e}", exc_info=True)
+
+
+_automation_engine: Optional[AutomationEngine] = None
+
+
+def set_automation_engine(engine: AutomationEngine):
+    """Устанавливает экземпляр AutomationEngine (вызывается в lifespan)."""
+    global _automation_engine
+    _automation_engine = engine
+
+
+def get_automation_engine() -> AutomationEngine:
+    """Зависимость для доступа к запущенному AutomationEngine."""
+    if _automation_engine is None:
+        raise RuntimeError("AutomationEngine not initialized")
+    return _automation_engine

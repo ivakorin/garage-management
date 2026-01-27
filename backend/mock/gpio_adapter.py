@@ -5,6 +5,8 @@ try:
 except ImportError:
 
     class GPIO:
+        LOW = None
+        HIGH = None
         IN = None
         BCM = None
         OUT = None

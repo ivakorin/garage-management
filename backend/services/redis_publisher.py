@@ -52,7 +52,7 @@ async def publish_to_redis(
     for attempt in range(max_retries + 1):
         try:
             await redis_client.publish(channel, payload)
-            logger.info(f"Sent to Redis: {channel} → {message.device_id}")
+            logger.debug(f"Sent to Redis: {channel} → {message.device_id}")
             return True
 
         except (redis.ConnectionError, redis.TimeoutError) as e:

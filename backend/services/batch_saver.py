@@ -81,7 +81,7 @@ async def save_batch_to_db(
         if to_insert:
             db_session.add_all(to_insert)
             await db_session.commit()
-            logger.info(f"Batch saved in DB: {len(to_insert)} records")
+            logger.debug(f"Batch saved in DB: {len(to_insert)} records")
             return len(to_insert)
 
         await db_session.commit()
