@@ -78,4 +78,3 @@ def setup_plugin_dependencies():
 
         except Exception as e:
             logger.error(f"[DEP] Fatal error with {package}: {e}", exc_info=True)
-            raise  # Re‑raise to prevent silent failure
