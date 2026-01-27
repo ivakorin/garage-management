@@ -8,6 +8,7 @@ export type ActuatorType = {
     id: number;
     created_at: string; // ISO-строка
     updated_at: string;  // ISO-строка
+    online?: boolean
 };
 
 export type UpdateActuatorType = Partial<Omit<ActuatorType, "id" | "device_id" | "created_at" | "updated_at">>;

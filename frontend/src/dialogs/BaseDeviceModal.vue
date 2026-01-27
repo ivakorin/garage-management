@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {defineEmits, defineProps} from 'vue';
 import {NButton, NCard, NModal} from 'naive-ui';
 
 const props = defineProps<{
@@ -9,7 +8,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'update', data: any): void;
+  (e: 'update', data?: any): void;
   (e: 'close'): void;
 }>();
 

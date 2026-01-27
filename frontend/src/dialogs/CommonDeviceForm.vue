@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import {defineProps} from 'vue';
 import {NForm, NFormItem, NInput} from 'naive-ui';
+import type {SensorsType} from "../../types/sensors.ts";
+import type {ActuatorType} from "../../types/actuators.ts";
 
 const props = defineProps<{
-  model: { name: string; description: string };
+  model: SensorsType | ActuatorType;
   readonly?: boolean;
 }>();
 </script>

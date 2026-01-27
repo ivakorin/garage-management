@@ -1,4 +1,3 @@
-<!-- EditSensor.vue -->
 <script setup lang="ts">
 import {ref, watch} from 'vue';
 import {useMessage} from 'naive-ui';

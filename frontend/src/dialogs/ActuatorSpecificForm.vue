@@ -1,6 +1,4 @@
-<!-- ActuatorSpecificForm.vue -->
 <script setup lang="ts">
-import {defineProps} from 'vue';
 import {NFormItem, NInputNumber, NSwitch} from 'naive-ui';
 import type {ActuatorType} from '../../types/actuators';
 
@@ -9,7 +7,6 @@ const props = defineProps<{ model: ActuatorType }>();
 
 <template>
   <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px;">
-    <!-- Pin -->
     <n-form-item
         label="Pin"
         style="flex: 1 1 120px; min-width: 120px;"
@@ -22,8 +19,6 @@ const props = defineProps<{ model: ActuatorType }>();
           size="small"
       />
     </n-form-item>
-
-    <!-- Inverted -->
     <n-form-item
         label="Inverted"
         style="flex: 1 1 100px; min-width: 100px;"
@@ -33,8 +28,6 @@ const props = defineProps<{ model: ActuatorType }>();
         <template #unchecked>No</template>
       </n-switch>
     </n-form-item>
-
-    <!-- Is Active -->
     <n-form-item
         label="Active"
         style="flex: 1 1 110px; min-width: 110px;"
