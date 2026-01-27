@@ -1,8 +1,6 @@
 FROM python:3.14-slim-bookworm AS base
 
-
 LABEL maintainer="Ignat Vakorin https://vakorin.net"
-
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -19,10 +17,7 @@ FROM base AS poetry-install
 COPY --from=system-deps / /
 RUN pip install --no-cache-dir poetry
 
-
-# === Исправленный этап python-deps ===
 FROM base AS python-deps
-# Копируем ВСЕ зависимости poetry (включая site-packages)
 COPY --from=poetry-install /usr/local/ /usr/local/
 COPY poetry.lock pyproject.toml ./
 RUN poetry config virtualenvs.create false && \
@@ -46,40 +41,26 @@ FROM base
 COPY --from=system-deps /usr/sbin/i2cdetect /usr/local/bin/i2cdetect
 COPY --from=system-deps /usr/sbin/i2cset /usr/local/bin/i2cset
 
-
 # Копируем poetry и его зависимости
 COPY --from=poetry-install /usr/local/ /usr/local/
 
-# Копируем установленные Python-пакеты из этапа python-deps
-COPY --from=python-deps /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
+# Копируем установленные Python-пакеты (включая RPi.GPIO)
+COPY --from=python-deps /usr/local/lib/python3.13/site-packages/ /usr/local/lib/python3.13/site-packages/
+COPY --from=rpi-deps /usr/local/lib/python3.13/site-packages/RPi* /usr/local/lib/python3.13/site-packages/
 
 
-RUN mkdir -p /tmp/rpi-check && \
-    if [ -d "/usr/local/lib/python3.14/site-packages/RPi" ]; then \
-        cp -r /usr/local/lib/python3.14/site-packages/RPi /tmp/rpi-check/; \
-    fi
-
-COPY --from=rpi-deps --chown=0:0 /usr/local/lib/python3.14/site-packages/RPi* /tmp/rpi-check
-
-
-RUN if [ -d "/tmp/rpi-check/RPi" ]; then \
-        cp -r /tmp/rpi-check/RPi* /usr/local/lib/python3.14/site-packages/; \
-        rm -rf /tmp/rpi-check; \
-    else \
-        rm -rf /tmp/rpi-check; \
-        echo "RPi packages not found (skipping copy)"; \
-    fi
-
-RUN find /usr/local/lib/python3.14/site-packages/ -name "*.dist-info" -exec rm -rf {} +
-
-
-COPY backend/ /app/
-
-
+# Проверяем наличие RPi.GPIO перед использованием
 RUN if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
-        python -c "import RPi.GPIO; print('RPi.GPIO OK')"; \
+        if [ -d "/usr/local/lib/python3.13/site-packages/RPi" ]; then \
+            python -c "import RPi.GPIO; print('RPi.GPIO OK')" || \
+            (echo "RPi.GPIO import failed" && exit 1); \
+        else \
+            echo "RPi directory not found in site-packages"; \
+        fi; \
     else \
         echo "RPi.GPIO test skipped (not arm64)"; \
     fi
+
+COPY backend/ /app/
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--proxy-headers", "--forwarded-allow-ips=*"]
