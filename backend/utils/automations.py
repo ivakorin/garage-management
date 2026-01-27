@@ -227,9 +227,6 @@ class AutomationEngine:
         if not device:
             logger.error(f"Device not found: {device_id}")
             return
-        original_state = state
-        if device.inverted:
-            state = not state
         if device.is_active == state:
             logger.debug(f"Device {device_id} already turned {state}")
             return
@@ -246,7 +243,7 @@ class AutomationEngine:
                 device_id=device_id,
                 timestamp=datetime.now().isoformat(),
                 data=command,
-                value="on" if original_state else "off",
+                value="on" if state else "off",
                 unit="state",
             )
             await publish_to_redis(
