@@ -15,14 +15,15 @@ RUN apt-get update && \
         i2c-tools \
     && rm -rf /var/lib/apt/lists/*
 
-
 FROM base AS poetry-install
 COPY --from=system-deps / /
 RUN pip install --no-cache-dir poetry
 
 
+# === Исправленный этап python-deps ===
 FROM base AS python-deps
-COPY --from=poetry-install /usr/local/bin/poetry /usr/local/bin/poetry
+# Копируем ВСЕ зависимости poetry (включая site-packages)
+COPY --from=poetry-install /usr/local/ /usr/local/
 COPY poetry.lock pyproject.toml ./
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --only main
@@ -45,15 +46,20 @@ FROM base
 COPY --from=system-deps /usr/sbin/i2cdetect /usr/local/bin/i2cdetect
 COPY --from=system-deps /usr/sbin/i2cset /usr/local/bin/i2cset
 
-COPY --from=poetry-install /usr/local/bin/poetry /usr/local/bin/poetry
+
+# Копируем poetry и его зависимости
+COPY --from=poetry-install /usr/local/ /usr/local/
+
+# Копируем установленные Python-пакеты из этапа python-deps
 COPY --from=python-deps /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
+
 
 RUN mkdir -p /tmp/rpi-check && \
     if [ -d "/usr/local/lib/python3.14/site-packages/RPi" ]; then \
         cp -r /usr/local/lib/python3.14/site-packages/RPi /tmp/rpi-check/; \
     fi
 
-COPY --from=rpi-deps --chown=0:0 /usr/local/lib/python3.14/site-packages/RPi* /tmp/rpi-check/
+COPY --from=rpi-deps --chown=0:0 /usr/local/lib/python3.14/site-packages/RPi* /tmp/rpi-check
 
 
 RUN if [ -d "/tmp/rpi-check/RPi" ]; then \
