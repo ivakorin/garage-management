@@ -3,12 +3,11 @@ FROM python:3.14-slim-bookworm AS base
 
 LABEL maintainer="Ignat Vakorin https://vakorin.net"
 
-
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
-# --- Этап 1: Установка системных зависимостей (общие)
+# --- Этап 1: Установка системных зависимостей
 FROM base AS system-deps
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -16,13 +15,18 @@ RUN apt-get update && \
         i2c-tools \
     && rm -rf /var/lib/apt/lists/*
 
+# Проверяем реальные пути к утилитам (на случай нестандартного расположения)
+RUN which i2cdetect || echo "i2cdetect not found" && \
+    which i2cset || echo "i2cset not found"
+
+
 # --- Этап 2: Установка Poetry
 FROM base AS poetry-install
 COPY --from=system-deps / /
 RUN pip install --no-cache-dir poetry
 
 
-# --- Этап 3: Установка Python-зависимостей (с Poetry)
+# --- Этап 3: Установка Python-зависимостей
 FROM base AS python-deps
 COPY --from=poetry-install /usr/local/bin/poetry /usr/local/bin/poetry
 COPY poetry.lock pyproject.toml ./
@@ -46,22 +50,30 @@ RUN if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
 
 # --- Финальный этап: Сборка образа
 FROM base
-# Копируем системные зависимости
-COPY --from=system-deps /usr/bin/i2cdetect /usr/bin/i2cdetect
-COPY --from=system-deps /usr/sbin/i2cset /usr/sbin/i2cset
+
+# Копируем системные зависимости (используем which для точного пути)
+RUN mkdir -p /usr/local/bin && \
+    cp $(which i2cdetect) /usr/local/bin/i2cdetect && \
+    cp $(which i2cset) /usr/local/bin/i2cset
+
+
+# Альтернатива: копируем напрямую из system-deps, если уверены в путях
+# COPY --from=system-deps /usr/sbin/i2cdetect /usr/local/bin/i2cdetect
+# COPY --from=system-deps /usr/sbin/i2cset /usr/local/bin/i2cset
 
 
 # Копируем Poetry и Python-зависимости
 COPY --from=poetry-install /usr/local/bin/poetry /usr/local/bin/poetry
-COPY --from=python-deps /usr/local/lib/python3.11/site-packages/ /usr/local/lib/python3.11/site-packages/
+COPY --from=python-deps /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
+
 
 # Копируем RPi.GPIO (если установлен)
-COPY --from=rpi-deps /usr/local/lib/python3.11/site-packages/RPi /usr/local/lib/python3.11/site-packages/RPi
-COPY --from=rpi-deps /usr/local/lib/python3.11/site-packages/RPi* /usr/local/lib/python3.11/site-packages/
+COPY --from=rpi-deps /usr/local/lib/python3.14/site-packages/RPi /usr/local/lib/python3.14/site-packages/RPi
+COPY --from=rpi-deps /usr/local/lib/python3.14/site-packages/RPi* /usr/local/lib/python3.14/site-packages/
 
 
 # Очищаем кэш pip
-RUN find /usr/local/lib/python3.11/site-packages/ -name "*.dist-info" -exec rm -rf {} +
+RUN find /usr/local/lib/python3.14/site-packages/ -name "*.dist-info" -exec rm -rf {} +
 
 
 # Копируем код приложения
