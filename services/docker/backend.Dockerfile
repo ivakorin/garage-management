@@ -15,15 +15,18 @@ RUN apt-get update && \
         i2c-tools \
     && rm -rf /var/lib/apt/lists/*
 
+
 FROM base AS poetry-install
 COPY --from=system-deps / /
 RUN pip install --no-cache-dir poetry
+
 
 FROM base AS python-deps
 COPY --from=poetry-install /usr/local/bin/poetry /usr/local/bin/poetry
 COPY poetry.lock pyproject.toml ./
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --only main
+
 
 FROM base AS rpi-deps
 COPY --from=system-deps / /
@@ -45,10 +48,21 @@ COPY --from=system-deps /usr/sbin/i2cset /usr/local/bin/i2cset
 COPY --from=poetry-install /usr/local/bin/poetry /usr/local/bin/poetry
 COPY --from=python-deps /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
 
+RUN mkdir -p /tmp/rpi-check && \
+    if [ -d "/usr/local/lib/python3.14/site-packages/RPi" ]; then \
+        cp -r /usr/local/lib/python3.14/site-packages/RPi /tmp/rpi-check/; \
+    fi
 
-COPY --from=rpi-deps /usr/local/lib/python3.14/site-packages/RPi /usr/local/lib/python3.14/site-packages/RPi
-COPY --from=rpi-deps /usr/local/lib/python3.14/site-packages/RPi* /usr/local/lib/python3.14/site-packages/
+COPY --from=rpi-deps --chown=0:0 /usr/local/lib/python3.14/site-packages/RPi* /tmp/rpi-check/
 
+
+RUN if [ -d "/tmp/rpi-check/RPi" ]; then \
+        cp -r /tmp/rpi-check/RPi* /usr/local/lib/python3.14/site-packages/; \
+        rm -rf /tmp/rpi-check; \
+    else \
+        rm -rf /tmp/rpi-check; \
+        echo "RPi packages not found (skipping copy)"; \
+    fi
 
 RUN find /usr/local/lib/python3.14/site-packages/ -name "*.dist-info" -exec rm -rf {} +
 
