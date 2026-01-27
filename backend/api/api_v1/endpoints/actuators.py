@@ -22,11 +22,11 @@ async def actuators_update(
 
 @router.get("/get/all", response_model=Optional[List[ActuatorRead]])
 async def get_sensors(session: AsyncSession = Depends(get_async_session)):
-    return ActuatorCRUD.get_all(session)
+    return await ActuatorCRUD.get_all(session)
 
 
 @router.get("/get/{device_id}", response_model=ActuatorRead)
 async def get_actuator(
     device_id: str, session: AsyncSession = Depends(get_async_session)
 ):
-    return ActuatorCRUD.get(device_id=device_id, session=session)
+    return await ActuatorCRUD.get(device_id=device_id, session=session)
