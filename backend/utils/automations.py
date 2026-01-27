@@ -71,14 +71,14 @@ class AutomationEngine:
             return False
 
         current_value = await self._get_sensor_value_from_db(sensor_id)
+        logger.info(f"Current value: {current_value}")
         if current_value is not None:
             await self._update_redis_cache(sensor_id, current_value)
 
         if current_value is None:
             return False
-
-        # Сравниваем с предыдущим значением из Redis
         prev_value = await self._get_prev_value_from_redis(sensor_id)
+        logger.info(f"Previous value: {prev_value}")
         await self._update_prev_value_in_redis(sensor_id, current_value)
 
         return prev_value is None or current_value != prev_value
@@ -97,12 +97,9 @@ class AutomationEngine:
             if sensor_value is None:
                 results.append(False)
                 continue
-
-            # Применяем оператор
             result = self._evaluate_condition(sensor_value, cond)
             results.append(result)
 
-        # Объединяем по логике AND/OR
         if trigger.combine_logic == "AND":
             return all(results)
         else:
@@ -122,7 +119,6 @@ class AutomationEngine:
         elif condition.operator == ConditionOperator.LTE:
             result = value <= condition.value
 
-        # Учитываем гистерезис
         if condition.hysteresis and result:
             result = (
                 value >= condition.hysteresis.low and value <= condition.hysteresis.high
@@ -159,7 +155,6 @@ class AutomationEngine:
                 logger.error(f"Invalid command in group_action: {cmd}")
                 continue
 
-            # Ждём заданную задержку
             if delay > 0:
                 await asyncio.sleep(delay)
 
@@ -181,11 +176,11 @@ class AutomationEngine:
                 )
 
     async def _get_sensor_value(self, sensor_id: str) -> Optional[float]:
-        # Сначала пробуем Redis
+
         value = await self._get_sensor_value_from_redis(sensor_id)
         if value is not None:
             return value
-        # Если нет — берём из БД и кэшируем
+
         value = await self._get_sensor_value_from_db(sensor_id)
         if value is not None:
             await self._update_redis_cache(sensor_id, value)
@@ -215,7 +210,6 @@ class AutomationEngine:
     async def _send_notification(self, recipient: str, message: str):
         """Отправляет уведомление (реализацию можно расширить)."""
         logger.info(f"Notification to {recipient}: {message}")
-        # Здесь можно добавить отправку email/push/SMS
 
     async def _control_device(self, device_id: str, state: bool):
         """
@@ -288,7 +282,7 @@ class AutomationEngine:
         Загружает плагин по device_id из БД.
         :return: экземпляр плагина или None
         """
-        # Получаем запись из plugins_registry
+
         result = await self.db_session.execute(
             select(PluginRegistry).where(PluginRegistry.device_id == device_id)
         )
@@ -302,21 +296,17 @@ class AutomationEngine:
         class_name = registry.class_name
 
         try:
-            # Импортируем модуль
+
             module = importlib.import_module(module_name)
-            # Получаем класс плагина
+
             plugin_class = getattr(module, class_name)
 
-            # Создаём экземпляр
             plugin = plugin_class(
                 device_id=device_id,
-                # Здесь можно передать дополнительные параметры из registry,
-                # например, pin, inverted, если они хранятся в БД
             )
-            # Инициализируем аппаратную часть
+
             await plugin.init_hardware()
 
-            # Сохраняем в кэш
             self._plugin_cache[device_id] = plugin
             logger.info(f"Loaded plugin {class_name} for {device_id} from {module_name}")
             return plugin
@@ -334,17 +324,15 @@ class AutomationEngine:
 
     async def cleanup(self):
         """Очистка ресурсов при остановке движка."""
-        # 1. Очищаем все плагины
+
         for plugin in self._plugin_cache.values():
             try:
                 await plugin.cleanup()
             except Exception as e:
                 logger.error(f"Error when clearing the plugin {plugin.device_id}: {e}")
 
-        # 2. Очищаем кэш плагинов
         self._plugin_cache.clear()
 
-        # 3. Закрываем Redis-соединение
         try:
             await self.redis_client.close()
             logger.info("Redis client is closed")
