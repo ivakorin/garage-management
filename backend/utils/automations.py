@@ -224,11 +224,23 @@ class AutomationEngine:
         :param state: True — включить, False — выключить
         """
         device = await ActuatorCRUD.get(device_id=device_id, session=self.db_session)
+        command = {"action": "set_state", "state": state}
+        redis_message = SensorMessage(
+            device_id=device_id,
+            timestamp=datetime.now().isoformat(),
+            data=command,
+            value="on" if state else "off",
+            unit="state",
+        )
         if not device:
             logger.error(f"Device not found: {device_id}")
             return
         if device.is_active == state:
             logger.debug(f"Device {device_id} already turned {state}")
+            await publish_to_redis(
+                redis_client=self.redis_client,
+                message=redis_message,
+            )
             return
         try:
             plugin = self._plugin_cache.get(device_id)
@@ -237,15 +249,8 @@ class AutomationEngine:
                 if not plugin:
                     logger.error(f"Plugin not found for device_id={device_id}")
                     return
-            command = {"action": "set_state", "state": state}
+
             await plugin.handle_command(command)
-            redis_message = SensorMessage(
-                device_id=device_id,
-                timestamp=datetime.now().isoformat(),
-                data=command,
-                value="on" if state else "off",
-                unit="state",
-            )
             await publish_to_redis(
                 redis_client=self.redis_client,
                 message=redis_message,
