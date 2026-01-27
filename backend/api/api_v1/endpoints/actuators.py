@@ -12,7 +12,7 @@ from utils.automations import AutomationEngine
 router = APIRouter(prefix="/actuators", tags=["actuators"])
 
 
-@router.patch("/update/", response_model=ActuatorRead)
+@router.patch("/update", response_model=ActuatorRead)
 async def actuators_update(
     actuator: ActuatorUpdate, session: AsyncSession = Depends(get_async_session)
 ):
