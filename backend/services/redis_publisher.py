@@ -4,7 +4,7 @@ from typing import Optional
 
 import redis.asyncio as redis
 
-from schemas.sensor import SensorMessage
+from schemas.sensors import SensorMessage
 
 logger = logging.getLogger(__name__)
 

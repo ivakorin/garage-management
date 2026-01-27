@@ -12,7 +12,7 @@ from api.api_v1 import router
 from collectors.data_collector import DataCollector
 from collectors.mqtt_collector import MQTTCollector
 from core.settings import settings
-from crud.sensor import DeviceDataCRUD
+from crud.sensors import SensorDataCRUD
 from db.database import init_db, async_session_context
 from models import *  # noqa
 from services.actuator_manager import ActuatorManager
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialized")
 
         async with async_session_context() as db_session:
-            await DeviceDataCRUD.drop_state(db_session)
+            await SensorDataCRUD.drop_state(db_session)
             loaded_plugins = await load_plugins(db_session)
             plugins.clear()
             plugins.update(loaded_plugins)

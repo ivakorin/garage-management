@@ -7,7 +7,7 @@ import redis.asyncio as redis
 from fastapi import WebSocket
 
 from core.settings import settings
-from schemas.sensor import SensorMessage  # ваш класс сообщения
+from schemas.sensors import SensorMessage  # ваш класс сообщения
 
 logger = logging.getLogger(__name__)
 

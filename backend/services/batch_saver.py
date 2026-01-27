@@ -7,9 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.settings import settings
-from crud.sensor import DeviceDataCRUD
+from crud.sensors import SensorDataCRUD
 from models import Sensor, SensorData
-from schemas.sensor import SensorMessage, DeviceUpdateSchema
+from schemas.sensors import SensorMessage, SensoeUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +54,12 @@ async def save_batch_to_db(
                 db_session.add(device)
                 devices[msg.device_id] = device
             else:
-                updated_online = DeviceUpdateSchema(
+                updated_online = SensoeUpdateSchema(
                     device_id=msg.device_id,
                     online=msg.online,
                     updated_at=datetime.now(),
                 )
-                await DeviceDataCRUD._update_core(data=updated_online, session=db_session)
+                await SensorDataCRUD._update_core(data=updated_online, session=db_session)
             last_data = last_data_map.get(msg.device_id)
             if _is_data_changed(last_data, msg.data):
                 to_cleanup.add(msg.device_id)
@@ -73,7 +73,7 @@ async def save_batch_to_db(
                 to_insert.append(db_data)
         if to_cleanup:
             for dev_id in to_cleanup:
-                await DeviceDataCRUD.cleanup_old_data(
+                await SensorDataCRUD.cleanup_old_data(
                     session=db_session,
                     device_id=dev_id,
                     retention_days=retention_days,

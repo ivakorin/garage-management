@@ -13,13 +13,13 @@ class SensorMessage(BaseModel):
     online: Optional[bool] = None
 
 
-class DeviceBaseSchema(BaseModel):
+class SensorBaseSchema(BaseModel):
     device_id: str
     name: str
     description: Optional[str]
 
 
-class DeviceReadSchema(DeviceBaseSchema):
+class SensorReadSchema(SensorBaseSchema):
     id: int
     created_at: datetime
     updated_at: datetime
@@ -33,7 +33,7 @@ class DeviceReadSchema(DeviceBaseSchema):
     online: bool
 
 
-class DeviceUpdateSchema(BaseModel):
+class SensoeUpdateSchema(BaseModel):
     id: Optional[int] = None
     device_id: str
     name: Optional[str] = None
@@ -46,7 +46,7 @@ class DeviceUpdateSchema(BaseModel):
             raise ValueError("At least one field must be provided for update")
 
 
-class DeviceDataReadSchema(BaseModel):
+class SensorDataReadSchema(BaseModel):
     device_id: str
     timestamp: datetime
     value: Optional[float] = None

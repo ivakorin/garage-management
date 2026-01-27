@@ -8,9 +8,11 @@ import redis.asyncio as redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crud.sensor import DeviceDataCRUD
+from crud.actuators import ActuatorCRUD
+from crud.sensors import SensorDataCRUD
 from db.database import engine
 from models import PluginRegistry
+from schemas.actuators import ActuatorUpdate, ActuatorCommandCreate
 from schemas.automations import (
     Automation,
     TriggerType,
@@ -39,7 +41,6 @@ class AutomationEngine:
         self.actuator_manager = actuator_manager
         self.automations = {a.id: a for a in automations}
         self.running = True
-        # Кэш загруженных плагинов: {device_id: экземпляр плагина}
         self._plugin_cache: Dict[str, Any] = {}
 
     async def run(self):
@@ -207,7 +208,7 @@ class AutomationEngine:
         await self.redis_client.set(f"sensor:{sensor_id}:prev_value", str(value))
 
     async def _get_sensor_value_from_db(self, sensor_id: str) -> Optional[float]:
-        return await DeviceDataCRUD.get_value(sensor_id, self.db_session)
+        return await SensorDataCRUD.get_value(sensor_id, self.db_session)
 
     async def _send_notification(self, recipient: str, message: str):
         """Отправляет уведомление (реализацию можно расширить)."""
@@ -220,6 +221,15 @@ class AutomationEngine:
         :param device_id: ID устройства из БД
         :param state: True — включить, False — выключить
         """
+        current_state = await ActuatorCRUD.get(
+            device_id=device_id, session=self.db_session
+        )
+        if not current_state:
+            logger.error(f"Device not found: {device_id}")
+            return
+        if current_state.is_active == state:
+            logger.debug(f"Device {device_id} already turned {state}")
+            return
         try:
             # 1. Ищем плагин в кэше
             plugin = self._plugin_cache.get(device_id)
@@ -233,11 +243,30 @@ class AutomationEngine:
             # 3. Выполняем команду
             command = {"action": "set_state", "state": state}
             await plugin.handle_command(command)
+            actuator = ActuatorUpdate(
+                device_id=device_id,
+                is_active=state,
+                updated_at=datetime.now(),
+            )
+            await ActuatorCRUD.update(actuator=actuator, session=self.db_session)
+            commands = ActuatorCommandCreate(
+                device_id=device_id,
+                command=str(command),
+                success=True,
+            )
+            await ActuatorCRUD.add_command(commands=commands, session=self.db_session)
             logger.info(
                 f"Device {device_id} turned {'on' if state else 'off'} via plugin"
             )
 
         except Exception as e:
+            commands = ActuatorCommandCreate(
+                device_id=device_id,
+                command=str(command),
+                success=False,
+                error_message=str(e),
+            )
+            await ActuatorCRUD.add_command(commands=commands, session=self.db_session)
             logger.error(f"Failed to control device {device_id}: {e}", exc_info=True)
 
     async def _load_plugin_by_device_id(self, device_id: str) -> Optional[Any]:

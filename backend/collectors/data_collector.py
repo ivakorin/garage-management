@@ -6,7 +6,7 @@ import redis.asyncio as redis
 
 from core.settings import settings
 from plugins.template import DevicePlugin
-from schemas.sensor import SensorMessage
+from schemas.sensors import SensorMessage
 from services.base_collector import BaseCollector
 from services.batch_saver import save_batch_to_db, extract_numeric_value
 from services.mqtt_client import AsyncMQTTClient

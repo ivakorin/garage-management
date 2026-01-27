@@ -7,8 +7,8 @@ from typing import Optional
 import redis.asyncio as redis
 
 from core.settings import settings
-from crud.sensor import DeviceDataCRUD
-from schemas.sensor import SensorMessage, DeviceUpdateSchema
+from crud.sensors import SensorDataCRUD
+from schemas.sensors import SensorMessage, SensoeUpdateSchema
 from services.base_collector import BaseCollector
 from services.batch_saver import save_batch_to_db
 from services.mqtt_client import AsyncMQTTClient
@@ -77,20 +77,20 @@ class MQTTCollector(BaseCollector):
                 online = json.loads(payload_str).strip().lower() == "true"
             except AttributeError as e:
                 online = payload_str
-            devices = await DeviceDataCRUD.search(
+            devices = await SensorDataCRUD.search(
                 pattern=device_id, session=self.db_session
             )
             if not devices:
                 logger.warning(f"[MQTT] Cannot find device {device_id}")
                 return
             for device in devices:
-                update_online = DeviceUpdateSchema(
+                update_online = SensoeUpdateSchema(
                     device_id=device,
                     online=online,
                     updated_at=datetime.now(),
                 )
                 try:
-                    await DeviceDataCRUD.update(
+                    await SensorDataCRUD.update(
                         data=update_online, session=self.db_session
                     )
                 except Exception as e:

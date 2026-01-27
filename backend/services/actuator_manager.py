@@ -5,12 +5,11 @@ import uuid
 from pathlib import Path
 from typing import Dict, Any
 
-from sqlalchemy import select
-
+from crud.actuators import ActuatorCRUD
 from crud.plugins import Plugins
-from models import Actuator
-from models.plugins import PluginRegistry
 from plugins.template import ActuatorPlugin
+from schemas.actuators import ActuatorCreate
+from schemas.plugins import PluginBaseSchema
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +50,9 @@ class ActuatorManager:
                         and issubclass(cls, ActuatorPlugin)
                         and cls is not ActuatorPlugin
                     ):
-                        result = await db_session.execute(
-                            select(PluginRegistry).where(
-                                PluginRegistry.module_name == module_name,
-                                PluginRegistry.class_name == attr_name,
-                            )
+                        registry = await Plugins.get(
+                            module_name=module_name, session=db_session
                         )
-                        registry = result.scalars().first()
-
                         if registry:
                             device_id = registry.device_id
                             if not await Plugins.is_running(device_id):
@@ -66,14 +60,12 @@ class ActuatorManager:
                         else:
                             uid = uuid.uuid4().hex[:12]
                             device_id = f"{filename.stem}_{uid}"
-                            registry = PluginRegistry(
+                            registry = PluginBaseSchema(
                                 module_name=module_name,
                                 class_name=attr_name,
                                 device_id=device_id,
-                                is_running=True,
                             )
-                            db_session.add(registry)
-                            await db_session.commit()
+                            await Plugins.add(plugin=registry, session=db_session)
                             logger.info(
                                 f"Registered new actuator in PluginRegistry: {device_id}"
                             )
@@ -90,46 +82,28 @@ class ActuatorManager:
                                 and param.default is not param.empty
                             ):
                                 inverted = param.default
-                        conflict_result = await db_session.execute(
-                            select(Actuator).where(
-                                Actuator.pin == pin, Actuator.device_id != device_id
-                            )
+                        check_actuator = await ActuatorCRUD.get(
+                            device_id=device_id, session=db_session
                         )
-                        conflicting_actuator = conflict_result.scalars().first()
-
-                        if conflicting_actuator:
+                        if check_actuator and check_actuator.pin == pin:
                             logger.error(
-                                f"Pin {pin} is already occupied by actuator {conflicting_actuator.device_id}. "
+                                f"Pin {pin} is already occupied by actuator {check_actuator.device_id} (Name: {check_actuator.name}). "
                                 f"Cannot load {device_id}. Please change pin in plugin constructor."
                             )
                             continue
-                        actuator_result = await db_session.execute(
-                            select(Actuator).where(Actuator.device_id == device_id)
-                        )
-                        actuator_db = actuator_result.scalars().first()
-
-                        if not actuator_db:
-                            actuator_db = Actuator(
+                        if not check_actuator:
+                            actuator_db = ActuatorCreate(
                                 device_id=device_id,
                                 name=filename.stem,
                                 description=f"Auto-generated for {module_name}.{attr_name}",
                                 pin=pin,
                                 inverted=inverted,
-                                is_active=True,
+                                is_active=False,  # Create non-active (switch off by default)
                             )
-                            db_session.add(actuator_db)
-                            await db_session.commit()
+                            await ActuatorCRUD.add(actuator_db, db_session)
                             logger.info(
                                 f"Created actuator metadata in DB: {device_id} (pin={pin})"
                             )
-                        else:
-                            if actuator_db.pin != pin or actuator_db.inverted != inverted:
-                                actuator_db.pin = pin
-                                actuator_db.inverted = inverted
-                                await db_session.commit()
-                                logger.info(
-                                    f"Updated actuator {device_id}: pin={pin}, inverted={inverted}"
-                                )
                         kwargs = {
                             "device_id": device_id,
                             "pin": pin,

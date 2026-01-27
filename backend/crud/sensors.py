@@ -7,15 +7,15 @@ from sqlalchemy import delete, select, and_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import SensorData, Sensor
-from schemas.sensor import DeviceReadSchema, DeviceUpdateSchema, DeviceDataReadSchema
+from schemas.sensors import SensorReadSchema, SensoeUpdateSchema, SensorDataReadSchema
 
 logger = logging.getLogger(__name__)
 
 
-class DeviceDataCRUD:
+class SensorDataCRUD:
 
     @staticmethod
-    async def update(data: DeviceUpdateSchema, session: AsyncSession) -> DeviceReadSchema:
+    async def update(data: SensoeUpdateSchema, session: AsyncSession) -> SensorReadSchema:
         try:
             update_stmt = (
                 update(Sensor)
@@ -29,7 +29,7 @@ class DeviceDataCRUD:
             await session.execute(update_stmt)
             await session.commit()
 
-            return await DeviceDataCRUD.get(data.device_id, session)
+            return await SensorDataCRUD.get(data.device_id, session)
 
         except Exception as e:
             await session.rollback()
@@ -49,7 +49,7 @@ class DeviceDataCRUD:
             logger.error(f"Error dropping state: {e}", exc_info=True)
 
     @staticmethod
-    async def _update_core(data: DeviceUpdateSchema, session: AsyncSession):
+    async def _update_core(data: SensoeUpdateSchema, session: AsyncSession):
         """
         Базовая логика обновления — без commit/rollback.
         Используется в batch-операциях.
@@ -72,7 +72,7 @@ class DeviceDataCRUD:
         await session.execute(stmt)
 
     @staticmethod
-    async def get_all(session: AsyncSession) -> List[DeviceReadSchema]:
+    async def get_all(session: AsyncSession) -> List[SensorReadSchema]:
         subq = (
             select(
                 SensorData.device_id,
@@ -109,7 +109,7 @@ class DeviceDataCRUD:
                 device_dict["timestamp"] = data.timestamp if data else None
                 # Валидируем через Pydantic
                 devices.append(
-                    DeviceReadSchema.model_validate(device_dict, from_attributes=True)
+                    SensorReadSchema.model_validate(device_dict, from_attributes=True)
                 )
 
             return devices
@@ -120,7 +120,7 @@ class DeviceDataCRUD:
             raise HTTPException(status_code=400, detail="No data found") from e
 
     @staticmethod
-    async def get(device_id: str, session: AsyncSession) -> DeviceReadSchema:
+    async def get(device_id: str, session: AsyncSession) -> SensorReadSchema:
         subq = (
             select(
                 SensorData.device_id,
@@ -156,7 +156,7 @@ class DeviceDataCRUD:
         device_dict = device.__dict__.copy()
         device_dict["timestamp"] = device_data.timestamp if device_data else None
         device_dict["value"] = device_data.value if device_data else None
-        return DeviceReadSchema.model_validate(device_dict, from_attributes=True)
+        return SensorReadSchema.model_validate(device_dict, from_attributes=True)
 
     @staticmethod
     async def search(pattern: str, session: AsyncSession) -> Optional[List[str]]:
@@ -204,7 +204,7 @@ class DeviceDataCRUD:
     async def get_history(
         session: AsyncSession,
         device_id: str,
-    ) -> List[DeviceDataReadSchema]:
+    ) -> List[SensorDataReadSchema]:
         stmt = (
             select(
                 SensorData.device_id,
@@ -225,7 +225,7 @@ class DeviceDataCRUD:
             validated_data = []
             for row in rows:
                 # row — это кортеж (device_id, timestamp, value, unit)
-                schema = DeviceDataReadSchema(
+                schema = SensorDataReadSchema(
                     device_id=row[0],
                     timestamp=row[1],
                     value=row[2],

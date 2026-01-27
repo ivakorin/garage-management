@@ -4,13 +4,13 @@ from typing import Optional
 from pydantic import BaseModel, model_validator, field_validator
 
 
-class PluginBaseShema(BaseModel):
+class PluginBaseSchema(BaseModel):
     module_name: str
     class_name: str
     device_id: str
 
 
-class PluginReadShema(PluginBaseShema):
+class PluginReadSchema(PluginBaseSchema):
     is_running: bool
     id: int
     created_at: datetime
@@ -22,7 +22,7 @@ class PluginReadShema(PluginBaseShema):
     }
 
 
-class PluginUpdateSchema(PluginBaseShema):
+class PluginUpdateSchema(PluginBaseSchema):
     id: int
     updated_at: Optional[datetime] = None
     module_name: Optional[str] = None

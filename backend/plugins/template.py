@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, Any, AsyncGenerator
 
 from crud.plugins import Plugins
-from schemas.sensor import SensorMessage
+from schemas.sensors import SensorMessage
 
 logger = logging.getLogger(__name__)
 
