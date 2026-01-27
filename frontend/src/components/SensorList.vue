@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import {ref} from 'vue'
-import {fetchDevicesAPI} from '../api/devices'
+import {fetchDevicesAPI} from '../api/sensors.ts'
 import type {SensorsType} from "../../types/sensors.ts";
 import type {Widget} from "../composables/useDraggableWidgets.ts";
 import {PhPencil} from "@phosphor-icons/vue";
 import FormattedPluginName from "./FormattedPluginName.vue";
-import EditDevice from "../dialogs/editDevice.vue";
+import EditSensor from "../dialogs/EditSensor.vue";
 
 // Состояние
 const devices = ref<SensorsType[]>([])
@@ -32,7 +32,7 @@ const addToDashboard = (device: SensorsType) => {
   const widget: Widget = {
     id: device.id,
     device_id: device.device_id,
-    type: "device",
+    type: "sensor",
     name: device.name,
     description: device.description,
     x: 0,
@@ -59,7 +59,6 @@ loadDevices()
 
 <template>
   <div class="device-list">
-    <h3>Devices</h3>
     <n-grid
         v-for="device in devices"
         :key="device.id"
@@ -101,7 +100,7 @@ loadDevices()
       </n-grid-item>
     </n-grid>
   </div>
-  <edit-device
+  <edit-sensor
       v-if="currentItem"
       v-model:show="showModal"
       :initial-data="currentItem"

@@ -3,12 +3,14 @@ import {computed, onMounted, onUnmounted, ref} from 'vue'
 import type {Widget} from '../composables/useDraggableWidgets'
 import FormattedPluginName from './FormattedPluginName.vue'
 import {PhCheckCircle, PhMinusCircle, PhPencil} from '@phosphor-icons/vue'
-import EditDevice from '../dialogs/editDevice.vue'
-import {readDeviceAPI} from '../api/devices.ts'
+import EditSensor from '../dialogs/EditSensor.vue'
+import {readDeviceAPI} from '../api/sensors.ts'
 import type {SensorDataReadType, SensorsType} from '../../types/sensors.ts'
 import {SensorWebSocket} from '../ws/webSocket.ts'
 import SensorHistoryChart from "../dialogs/SensorHistoryChart.vue"
 import unitSymbolsJson from '../misc/measure_units/units.json';
+import type {ActuatorType} from "../../types/actuators.ts";
+import {readActuatorAPI} from "../api/actuators.ts";
 
 onMounted(() => {
   unitSymbols.value = unitSymbolsJson;
@@ -44,7 +46,7 @@ const startHeight = ref(0)
 const sensorData = ref<SensorDataReadType | null>(null)
 
 const contentLoading = ref<boolean>(true)
-const currentItem = ref<SensorsType | null>(null)
+const currentItem = ref<SensorsType | ActuatorType | null>(null)
 const showModal = ref<boolean>(false)
 const showDetails = ref<boolean>(false)
 const showHistory = ref<boolean>(false)
@@ -76,21 +78,35 @@ const displayedUnit = computed((): string => {
   return unitSymbols.value[unitKey] || unitKey
 })
 
-const loadItem = async (): Promise<SensorsType> => {
-  const response = await readDeviceAPI(props.data.device_id)
-  currentItem.value = response
+const loadItem = async (): Promise<SensorsType | ActuatorType> => {
+  let response: SensorsType | ActuatorType;
 
-  ws = new SensorWebSocket()
-  ws.connect()
-  ws.subscribe(response.device_id)
+  if (props.data.type === 'sensor') {
+    response = await readDeviceAPI(props.data.device_id);
+  } else if (props.data.type === 'actuator') {
+    response = await readActuatorAPI(props.data.device_id);
+  } else {
+    throw new Error(`Unsupported device type: ${props.data.type}`);
+  }
 
+  currentItem.value = response;
+
+  // Инициализация WebSocket
+  ws = new SensorWebSocket();
+  ws.connect();
+  ws.subscribe(response.device_id);
+
+  // Подписка на обновления
   ws.onSensorUpdate(response.device_id, (data) => {
-    sensorData.value = data
-  })
+    sensorData.value = data;
+  });
 
-  setTimeout(() => ws?.getSubscriptions(), 3000)
-  return response
-}
+  // Проверка подписок через 3 секунды
+  setTimeout(() => ws?.getSubscriptions(), 3000);
+
+  return response;
+};
+
 
 const onUpdate = () => loadItem()
 const editItem = () => showModal.value = true
@@ -248,8 +264,20 @@ onUnmounted(() => {
 
       <div class="widget-content">
         <div class="main-display">
-          <div class="value">{{ sensorData?.value?.toFixed(2) || '—' }}</div>
-          <div v-if="displayedUnit" class="unit">{{ displayedUnit }}</div>
+          <div class="value">
+            {{
+              (typeof sensorData?.value === 'number' && !isNaN(sensorData.value))
+                  ? sensorData.value.toFixed(2)
+                  : (typeof sensorData?.value === 'string')
+                      ? sensorData.value
+                      : '—'
+            }}
+
+          </div>
+          <div v-if="displayedUnit" class="unit">{{
+              (typeof sensorData?.value === 'number' && !isNaN(sensorData.value)) ? displayedUnit : ''
+            }}
+          </div>
         </div>
         <n-space>
           <n-button
@@ -286,7 +314,14 @@ onUnmounted(() => {
                   {{ sensorData?.device_id || '—' }}
                 </n-descriptions-item>
                 <n-descriptions-item label="Value">
-                  {{ sensorData?.value?.toFixed(2) || '—' }}
+                  {{
+                    (typeof sensorData?.value === 'number' && !isNaN(sensorData.value))
+                        ? sensorData.value.toFixed(2)
+                        : (typeof sensorData?.value === 'string')
+                            ? sensorData.value
+                            : '—'
+                  }}
+
                 </n-descriptions-item>
                 <n-descriptions-item label="Unit">
                   {{ sensorData?.unit || '—' }}
@@ -338,7 +373,7 @@ onUnmounted(() => {
         />
       </template>
     </div>
-    <edit-device
+    <edit-sensor
         v-if="currentItem"
         v-model:show="showModal"
         :initial-data="currentItem"

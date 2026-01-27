@@ -13,12 +13,13 @@ import {PhFloppyDisk, PhLayout, PhPencil} from '@phosphor-icons/vue'
 import {useDraggableWidgets} from '../composables/useDraggableWidgets'
 import WidgetCard from './WidgetCard.vue'
 import PluginList from "./PluginList.vue";
-import DeviceList from "./DeviceList.vue";
+import SensorList from "./SensorList.vue";
+import ActuatorsList from "./ActuatorsList.vue";
 
 // Режимы
 const isEditing = ref(false)
 const isSiderVisible = ref(false)
-const activeTab = ref('devices')
+const activeTab = ref('sensors')
 
 // Виджеты
 const {widgets, addWidget, saveLayout, initLayout} = useDraggableWidgets()
@@ -140,15 +141,19 @@ onMounted(() => {
     >
       <n-tabs
           v-model:value="activeTab"
-          type="line"
+          type="card"
           tab-position="right"
           vertical
+          size="small"
       >
         <n-tab-pane name="plugins" tab="Plugins">
           <plugin-list @add-widget="addWidget" :is-editing="isEditing"/>
         </n-tab-pane>
-        <n-tab-pane name="devices" tab="Devices">
-          <device-list @add-widget="addWidget" :is-editing="isEditing"/>
+        <n-tab-pane name="sensors" tab="Sensors">
+          <sensor-list @add-widget="addWidget" :is-editing="isEditing"/>
+        </n-tab-pane>
+        <n-tab-pane name="actuators" tab="Actuators">
+          <actuators-list @add-widget="addWidget" :is-editing="isEditing"/>
         </n-tab-pane>
       </n-tabs>
 

@@ -4,7 +4,7 @@ import {NButton, NModal} from 'naive-ui'
 import ECharts from 'vue-echarts'
 import 'echarts'
 import type {EChartsOption} from 'echarts'
-import {fetchSensorHistoryAPI} from '../api/devices.ts'
+import {fetchSensorHistoryAPI} from '../api/sensors.ts'
 import type {SensorDataReadType} from '../../types/sensors.ts'
 
 const props = defineProps<{

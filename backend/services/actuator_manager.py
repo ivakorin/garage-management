@@ -85,7 +85,11 @@ class ActuatorManager:
                         check_actuator = await ActuatorCRUD.get(
                             device_id=device_id, session=db_session
                         )
-                        if check_actuator and check_actuator.pin == pin:
+                        if (
+                            check_actuator
+                            and check_actuator.device_id != device_id
+                            and check_actuator.pin == pin
+                        ):
                             logger.error(
                                 f"Pin {pin} is already occupied by actuator {check_actuator.device_id} (Name: {check_actuator.name}). "
                                 f"Cannot load {device_id}. Please change pin in plugin constructor."
@@ -94,8 +98,7 @@ class ActuatorManager:
                         if not check_actuator:
                             actuator_db = ActuatorCreate(
                                 device_id=device_id,
-                                name=filename.stem,
-                                description=f"Auto-generated for {module_name}.{attr_name}",
+                                name=device_id,
                                 pin=pin,
                                 inverted=inverted,
                                 is_active=False,  # Create non-active (switch off by default)

@@ -64,7 +64,6 @@ loadPlugins()
 <template>
   <div class="plugin-list">
     <div>
-      <h3>Plugins</h3>
       <n-tooltip trigger="hover">
         <template #trigger>
           <n-button tertiary circle type="primary" @click="ReloadPlugins">

@@ -4,7 +4,7 @@ import {fetchLayoutAPI, saveLayoutAPI} from '../api/dashboard'
 export interface Widget {
     id: number
     device_id: string
-    type: 'plugin' | 'device'
+    type: 'plugin' | 'sensor' | 'actuator'
     name: string
     description?: string
     x: number

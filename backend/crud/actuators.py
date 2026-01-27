@@ -1,6 +1,7 @@
 import logging
-from typing import Optional
+from typing import Optional, List
 
+from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,9 +43,11 @@ class ActuatorCRUD:
         try:
             await session.execute(stmt)
             await session.commit()
+            return await ActuatorCRUD.get(actuator.device_id, session)
         except Exception as e:
             await session.rollback()
             logger.error(e)
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     @staticmethod
     async def add_command(commands: ActuatorCommandCreate, session: AsyncSession):
@@ -70,3 +73,18 @@ class ActuatorCRUD:
         except Exception as e:
             await session.rollback()
             logger.error(e)
+
+    @staticmethod
+    async def get_all(session: AsyncSession) -> Optional[List[ActuatorRead]]:
+        stmt = select(Actuator).order_by(Actuator.id)
+        try:
+            result = await session.execute(stmt)
+            actuators = result.scalars().all()
+            return [
+                ActuatorRead.model_validate(actuator, from_attributes=True)
+                for actuator in actuators
+            ]
+        except Exception as e:
+            await session.rollback()
+            logger.error(e)
+            raise HTTPException(status_code=404, detail="Not Found")

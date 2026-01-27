@@ -22,8 +22,10 @@ from schemas.automations import (
     ConditionOperator,
     Condition,
 )
+from schemas.sensors import SensorMessage
 from services.actuator_manager import ActuatorManager
 from services.automations import load_all_automations
+from services.redis_publisher import publish_to_redis
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +33,15 @@ logger = logging.getLogger(__name__)
 class AutomationEngine:
     def __init__(
         self,
-        redis_client: redis.Redis,
-        actuator_manager: ActuatorManager,
-        automations: list[Automation],
+        redis_client: redis.Redis = None,
+        actuator_manager: ActuatorManager = None,
+        automations: list[Automation] = None,
         db_session: Optional[AsyncSession] = None,
     ):
         self.db_session = db_session or AsyncSession(bind=engine)
         self.redis_client = redis_client
         self.actuator_manager = actuator_manager
-        self.automations = {a.id: a for a in automations}
+        self.automations = {a.id: a for a in automations} if automations else None
         self.running = True
         self._plugin_cache: Dict[str, Any] = {}
 
@@ -221,28 +223,36 @@ class AutomationEngine:
         :param device_id: ID устройства из БД
         :param state: True — включить, False — выключить
         """
-        current_state = await ActuatorCRUD.get(
-            device_id=device_id, session=self.db_session
-        )
-        if not current_state:
+        device = await ActuatorCRUD.get(device_id=device_id, session=self.db_session)
+        if not device:
             logger.error(f"Device not found: {device_id}")
             return
-        if current_state.is_active == state:
+        original_state = state
+        if device.inverted:
+            state = not state
+        if device.is_active == state:
             logger.debug(f"Device {device_id} already turned {state}")
             return
         try:
-            # 1. Ищем плагин в кэше
             plugin = self._plugin_cache.get(device_id)
             if not plugin:
-                # 2. Если нет в кэше — загружаем из БД
                 plugin = await self._load_plugin_by_device_id(device_id)
                 if not plugin:
                     logger.error(f"Plugin not found for device_id={device_id}")
                     return
-
-            # 3. Выполняем команду
             command = {"action": "set_state", "state": state}
             await plugin.handle_command(command)
+            redis_message = SensorMessage(
+                device_id=device_id,
+                timestamp=datetime.now().isoformat(),
+                data=command,
+                value="on" if original_state else "off",
+                unit="state",
+            )
+            await publish_to_redis(
+                redis_client=self.redis_client,
+                message=redis_message,
+            )
             actuator = ActuatorUpdate(
                 device_id=device_id,
                 is_active=state,

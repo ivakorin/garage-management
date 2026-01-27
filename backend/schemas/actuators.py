@@ -52,7 +52,7 @@ class ActuatorUpdate(BaseModel):
     pin: Optional[int] = None
     inverted: Optional[bool] = None
     is_active: Optional[bool] = None
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 
