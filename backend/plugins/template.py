@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict, Any, AsyncGenerator
 
 from crud.plugins import Plugins
+from mock.gpio_adapter import GPIO, is_rpi
 from schemas.sensors import SensorMessage
 
 logger = logging.getLogger(__name__)
@@ -78,25 +79,46 @@ class DevicePlugin(ABC):
 
 
 class ActuatorPlugin(ABC):
-    """Базовый класс для исполнительных устройств (реле, LED, серво и т. п.)."""
-
     def __init__(self, device_id: str, pin: int, inverted: bool = False):
         self.device_id = device_id
         self.pin = pin
         self.inverted = inverted
+        self._initialized = False
 
     async def init_hardware(self):
-        raise NotImplementedError
+        if self._initialized:
+            return  # Уже настроено
+
+        if not is_rpi():
+            logger.info(f"[{self.device_id}] GPIO not available (dev mode)")
+            self._initialized = True
+            return
+
+        try:
+            GPIO.setmode(GPIO.BCM)
+            if GPIO.gpio_function(self.pin) != GPIO.OUT:
+                GPIO.setup(self.pin, GPIO.OUT)
+            self._initialized = True
+            logger.info(f"[{self.device_id}] GPIO initialized on pin {self.pin}")
+        except Exception as e:
+            logger.error(f"[{self.device_id}] Failed to setup GPIO: {e}")
+            raise
 
     @abstractmethod
     async def handle_command(self, command: dict) -> None:
-        """Обрабатывает команды (должен быть реализован)."""
         raise NotImplementedError
 
     @abstractmethod
     async def get_state(self) -> dict:
-        """Возвращает текущее состояние (должен быть реализован)."""
         raise NotImplementedError
 
     async def cleanup(self):
-        pass
+        if not self._initialized:
+            return
+        if is_rpi():
+            try:
+                GPIO.cleanup(self.pin)
+                logger.info(f"[{self.device_id}] GPIO cleaned up")
+            except Exception as e:
+                logger.error(f"[{self.device_id}] Error in cleanup: {e}")
+        self._initialized = False

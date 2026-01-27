@@ -7,6 +7,7 @@ from typing import Dict, Any
 
 from crud.actuators import ActuatorCRUD
 from crud.plugins import Plugins
+from mock.gpio_adapter import is_rpi, GPIO
 from plugins.template import ActuatorPlugin
 from schemas.actuators import ActuatorCreate
 from schemas.plugins import PluginBaseSchema
@@ -40,6 +41,13 @@ class ActuatorManager:
             module_name = f"plugins.{filename.stem}"
 
             try:
+                if is_rpi():  # Только на Raspberry Pi
+                    current_mode = GPIO.gpio_function(pin)
+                    if current_mode != GPIO.IN and current_mode != GPIO.OUT:
+                        # Пин свободен
+                        pass
+                    else:
+                        logger.warning(f"Pin {pin} already in use (mode={current_mode})")
                 module = importlib.import_module(module_name)
 
                 for attr_name in dir(module):

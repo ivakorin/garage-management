@@ -277,6 +277,8 @@ class AutomationEngine:
                 error_message=str(e),
             )
             await ActuatorCRUD.add_command(commands=commands, session=self.db_session)
+            if plugin and plugin._initialized:
+                await plugin.cleanup()
             logger.error(f"Failed to control device {device_id}: {e}", exc_info=True)
 
     async def _load_plugin_by_device_id(self, device_id: str) -> Optional[Any]:
@@ -329,19 +331,25 @@ class AutomationEngine:
         return None
 
     async def cleanup(self):
-        """Очистка ресурсов при остановке."""
-        # Закрываем плагины
+        """Очистка ресурсов при остановке движка."""
+        # 1. Очищаем все плагины
         for plugin in self._plugin_cache.values():
             try:
                 await plugin.cleanup()
             except Exception as e:
-                logger.error(f"Error during plugin cleanup: {e}")
+                logger.error(f"Error when clearing the plugin {plugin.device_id}: {e}")
 
-                self._plugin_cache.clear()
+        # 2. Очищаем кэш плагинов
+        self._plugin_cache.clear()
 
-                # Закрываем Redis
-                await self.redis_client.close()
-                logger.info("AutomationEngine cleanup completed")
+        # 3. Закрываем Redis-соединение
+        try:
+            await self.redis_client.close()
+            logger.info("Redis client is closed")
+        except Exception as e:
+            logger.error(f"Error when closing the Redis client: {e}")
+
+        logger.info("AutomationEngine is completed and cleared")
 
 
 async def automations_loader(path: str):
