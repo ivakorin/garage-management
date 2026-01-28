@@ -249,8 +249,8 @@ class AutomationEngine:
             device_id=device_id,
             timestamp=datetime.now().isoformat(),
             data=command,
-            value="on" if state else "off",
-            unit="state",
+            value=1 if state else 0,
+            unit="boolean",
         )
         if not device:
             logger.error(f"Device not found: {device_id}")
