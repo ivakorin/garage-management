@@ -11,8 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup_plugin_dependencies():
-    lib_path = Path(__file__).parent.parent / "plugins" / "lib"  # Унифицированный путь
-    logger.info(f"[DEP] Added to sys.path: {lib_path}")
+    lib_path = Path(__file__).parent.parent / "plugins" / "lib"
     lib_path.mkdir(exist_ok=True)
     lib_path_str = str(lib_path.resolve())
 
@@ -20,47 +19,46 @@ def setup_plugin_dependencies():
         sys.path.insert(0, lib_path_str)
         logger.info(f"[DEP] Added to sys.path: {lib_path_str}")
 
+
     REQUIRED_PACKAGES = ["RPi.GPIO"]
 
     for package in REQUIRED_PACKAGES:
         try:
+            # 1. Проверяем, загружен ли модуль уже
             if package in sys.modules:
-                logger.info(f"[DEP] {package} has already been downloaded")
+                logger.info(f"[DEP] {package} already in sys.modules")
                 module = sys.modules[package]
             else:
-                importlib.invalidate_caches()  # Очищаем кеш
-                spec = importlib.util.find_spec(package)
-                if spec is not None:
-                    logger.info(f"[DEP] {package} found via find_spec")
-                    module = importlib.import_module(package)
-                else:
-                    logger.info(f"[DEP] Installing {package} in {lib_path_str}")
-                    subprocess.check_call(
-                        [
-                            sys.executable,
-                            "-m",
-                            "pip",
-                            "install",
-                            "--target",
-                            lib_path_str,
-                            package,
-                        ]
-                    )
+                # 2. Пробуем прямой импорт (обходит кеши find_spec)
+                try:
+                    module = __import__(package)
+                    logger.info(f"[DEP] {package} imported via __import__")
+                except ImportError:
+                    # 3. Если не получилось — устанавливаем
+                    logger.info(f"[DEP] Installing {package} to {lib_path_str}")
+                    subprocess.check_call([
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "--target",
+                        lib_path_str,
+                        package
+                    ])
 
-                    importlib.invalidate_caches()  # Повторно очищаем
-                    spec = importlib.util.find_spec(package)
-                    if spec is None:
-                        # Пробуем прямой импорт как запасной вариант
-                        try:
-                            module = __import__(package)
-                            logger.info(f"[DEP] {package} imported via __import__")
-                        except ImportError:
-                            raise ImportError(f"{package} not found after installation")
-                    else:
-                        module = importlib.import_module(package)
+                    # 4. После установки — принудительно перезагружаем модуль
+                    importlib.invalidate_caches()
+                    try:
+                        module = __import__(package)  # Прямой импорт
                         logger.info(f"[DEP] {package} installed and imported")
+                    except ImportError as e:
+                        # 5. Если всё равно не работает — проверяем структуру
+                        logger.error(f"[DEP] Failed to import {package} after install: {e}")
+                        # Выводим содержимое lib для отладки
+                        logger.debug(f"[DEP] Contents of {lib_path}: {list(lib_path.iterdir())}")
+                        raise
 
-            # Сохраняем в globals
+            # 6. Сохраняем в globals
             if package == "RPi.GPIO":
                 globals()["GPIO"] = module
                 logger.info("[DEP] RPi.GPIO imported as GPIO")
@@ -69,6 +67,7 @@ def setup_plugin_dependencies():
 
         except Exception as e:
             logger.error(f"[DEP] Error with {package}: {e}", exc_info=True)
+
 
 
 _automation_engine: Optional[AutomationEngine] = None
