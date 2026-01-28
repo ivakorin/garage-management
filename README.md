@@ -339,3 +339,4 @@ npm run dev
 [//]: # (- `troubleshooting.md` — устранение неполадок;)
 
 - `MQTTdevices`- подключение внешних устройств.
+- `Automations` - автоматизации 
