@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def setup_plugin_dependencies():
-    lib_path = Path(__file__).parent / "plugins" / "lib"  # Унифицированный путь
+    lib_path = Path(__file__).parent.parent / "plugins" / "lib"  # Унифицированный путь
+    logger.info(f"[DEP] Added to sys.path: {lib_path}")
     lib_path.mkdir(exist_ok=True)
     lib_path_str = str(lib_path.resolve())
 
