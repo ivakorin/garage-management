@@ -24,6 +24,14 @@ jobs:
           echo "$DOCKER_PASSWORD" | docker login registry.gitflic.ru \
             -u "${{ secrets.GITFLIC_USER }}" \
             --password-stdin
+      - name: Build and Push Frontend Image (multi-arch)
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64/v8 \
+            -t ${{ secrets.DOCKER_IMAGE_FRONTEND }} \
+            -f services/docker/frontend.Dockerfile \
+            . \
+            --push
 
       - name: Build and Push Backend Image (multi-arch)
         run: |
@@ -34,14 +42,6 @@ jobs:
             . \
             --push
 
-      - name: Build and Push Frontend Image (multi-arch)
-        run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64/v8 \
-            -t ${{ secrets.DOCKER_IMAGE_FRONTEND }} \
-            -f services/docker/frontend.Dockerfile \
-            . \
-            --push
 
       - name: Docker Logout
         run: docker logout registry.gitflic.ru
