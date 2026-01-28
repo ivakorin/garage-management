@@ -6,9 +6,14 @@ import {updateDeviceAPI} from '../api/sensors';
 import BaseDeviceModal from './BaseDeviceModal.vue';
 import CommonDeviceForm from './CommonDeviceForm.vue';
 import type {ActuatorType} from "../../types/actuators.ts";
+import {updateActuatorAPI} from "../api/actuators.ts";
 
 
-const props = defineProps<{ show: boolean; initialData: SensorsType | ActuatorType }>();
+const props = defineProps<{
+  show: boolean;
+  initialData: SensorsType | ActuatorType;
+  type: "sensors" | "actuators"
+}>();
 const emit = defineEmits<{
   (e: 'update', data: SensorsType): void;
   (e: 'close'): void
@@ -23,9 +28,15 @@ watch(() => props.initialData, (newVal) => {
 });
 
 const save = async () => {
+  let response = null
   isLoading.value = true;
   try {
-    const response = await updateDeviceAPI(editedData.value);
+    if (props.type === 'sensors') {
+      response = await updateDeviceAPI(editedData.value);
+    } else if (props.type === 'actuators') {
+      console.log(editedData.value)
+      response = await updateActuatorAPI(editedData.value);
+    }
     emit('update', response);
     message.success(`Device ${response.name} updated`);
   } catch (err) {
@@ -33,13 +44,14 @@ const save = async () => {
   } finally {
     isLoading.value = false;
   }
+  emit('close')
 };
 </script>
 
 <template>
   <base-device-modal
       :show="props.show"
-      title="Редактирование сенсора"
+      title="Edit unit"
       :is-loading="isLoading"
       @update="save"
       @close="emit('close')"

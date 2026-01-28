@@ -1,13 +1,19 @@
 import datetime
+import json
 import logging
 from typing import List, Optional
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import delete, select, and_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import SensorData, Sensor
-from schemas.sensors import SensorReadSchema, SensoeUpdateSchema, SensorDataReadSchema
+from schemas.sensors import (
+    SensorReadSchema,
+    SensoeUpdateSchema,
+    SensorDataReadSchema,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +130,6 @@ class SensorDataCRUD:
         subq = (
             select(
                 SensorData.device_id,
-                SensorData.value,
                 func.max(SensorData.timestamp).label("max_timestamp"),
             )
             .group_by(SensorData.device_id)
@@ -147,16 +152,41 @@ class SensorDataCRUD:
 
         result = await session.execute(stmt)
         row = result.first()
-
         if not row:
             await session.rollback()
             raise HTTPException(status_code=404, detail="Device not found")
 
-        device, device_data = row
-        device_dict = device.__dict__.copy()
-        device_dict["timestamp"] = device_data.timestamp if device_data else None
-        device_dict["value"] = device_data.value if device_data else None
-        return SensorReadSchema.model_validate(device_dict, from_attributes=True)
+        sensor, sensor_data = row
+        print(sensor)
+        data_dict = {}
+        if sensor_data:
+            try:
+                if isinstance(sensor_data.data, str):
+                    data_dict = json.loads(sensor_data.data)
+                    data_dict["unit"] = sensor_data.unit
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.error(f"Failed to parse sensor_data: {e}")
+                raise HTTPException(status_code=500, detail="Invalid sensor data format")
+
+        # Формируем SensorReadSchema
+        read_schema_dict = {
+            "id": sensor.id,
+            "device_id": sensor.device_id,
+            "name": sensor.name,
+            "description": sensor.description,
+            "created_at": sensor.created_at,
+            "updated_at": sensor.updated_at,
+            "timestamp": (sensor_data.timestamp if sensor_data else None),
+            "value": sensor_data.value if sensor_data else None,
+            "details": data_dict,
+            "online": True,
+        }
+
+        try:
+            return SensorReadSchema.model_validate(read_schema_dict, from_attributes=True)
+        except ValidationError as e:
+            logger.error(f"Pydantic validation error: {e}")
+            raise HTTPException(status_code=500, detail="Invalid data format")
 
     @staticmethod
     async def search(pattern: str, session: AsyncSession) -> Optional[List[str]]:

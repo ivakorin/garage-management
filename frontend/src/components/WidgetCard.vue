@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import type {Widget} from '../composables/useDraggableWidgets'
 import FormattedPluginName from './FormattedPluginName.vue'
-import {PhCheckCircle, PhMinusCircle, PhPencil} from '@phosphor-icons/vue'
+import {
+  PhCheckCircle,
+  PhClockClockwise,
+  PhMinusCircle,
+  PhPencil,
+  PhPower
+} from '@phosphor-icons/vue'
 import EditSensor from '../dialogs/EditSensor.vue'
 import {readDeviceAPI} from '../api/sensors.ts'
 import type {SensorDataReadType, SensorsType} from '../../types/sensors.ts'
 import {SensorWebSocket} from '../ws/webSocket.ts'
 import SensorHistoryChart from "../dialogs/SensorHistoryChart.vue"
 import unitSymbolsJson from '../misc/measure_units/units.json';
-import type {ActuatorType} from "../../types/actuators.ts";
-import {readActuatorAPI} from "../api/actuators.ts";
+import type {ActuatorType, SensorDataType} from "../../types/actuators.ts";
+import {readActuatorAPI, updateActuatorAPI} from "../api/actuators.ts";
 
 onMounted(() => {
   unitSymbols.value = unitSymbolsJson;
@@ -43,7 +49,7 @@ const resizeEdge = ref<'' | 'se' | 'e' | 's'>('')
 const startWidth = ref(0)
 const startHeight = ref(0)
 
-const sensorData = ref<SensorDataReadType | null>(null)
+const sensorData = ref<SensorDataReadType | SensorDataType | null>(null)
 
 const contentLoading = ref<boolean>(true)
 const currentItem = ref<SensorsType | ActuatorType | null>(null)
@@ -52,11 +58,8 @@ const showDetails = ref<boolean>(false)
 const showHistory = ref<boolean>(false)
 
 let ws: SensorWebSocket | null = null
-
-// 1. Реактивное хранилище для символов единиц
 const unitSymbols = ref<Record<string, string>>({})
-
-// 2. Загрузка JSON при монтировании
+const actuatorState = ref<boolean>(false)
 onMounted(async () => {
 
   unitSymbols.value = unitSymbolsJson;
@@ -69,12 +72,9 @@ onMounted(async () => {
   }
 })
 
-// 3. Вычисляемое свойство: подставляем символ для единицы
 const displayedUnit = computed((): string => {
   const unitKey = sensorData.value?.unit
   if (!unitKey) return ''
-
-  // Ищем символ в JSON, если не нашли — возвращаем исходную единицу
   return unitSymbols.value[unitKey] || unitKey
 })
 
@@ -83,14 +83,32 @@ const loadItem = async (): Promise<SensorsType | ActuatorType> => {
 
   if (props.data.type === 'sensor') {
     response = await readDeviceAPI(props.data.device_id);
+    sensorData.value = {
+      device_id: response.device_id,
+      data: response.details,
+      timestamp: response.updated_at,
+      value: response.value,
+      unit: response.details.unit,
+      online: response.online
+    }
+    currentItem.value = response;
+    currentItem.value.type = 'sensors'
   } else if (props.data.type === 'actuator') {
     response = await readActuatorAPI(props.data.device_id);
+    sensorData.value = {
+      device_id: response.device_id,
+      timestamp: response.updated_at,
+      value: Number(response.is_active),
+      unit: "boolean",
+      online: response.is_active
+    } satisfies SensorDataType
+    currentItem.value = response;
+    currentItem.value.online = response.is_active
+    currentItem.value.type = 'actuators'
+    actuatorState.value = response.is_active
   } else {
     throw new Error(`Unsupported device type: ${props.data.type}`);
   }
-
-  currentItem.value = response;
-
   // Инициализация WebSocket
   ws = new SensorWebSocket();
   ws.connect();
@@ -204,6 +222,30 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', onResizeMousemove)
   document.removeEventListener('mouseup', onResizeMouseup)
 })
+const statusActive = computed(() => {
+  if (currentItem.value) {
+    if (currentItem.value.type === 'sensors') {
+      return currentItem.value.online
+    } else if (currentItem.value.type === 'actuators') {
+      return currentItem.value.is_active
+    }
+  }
+  return false
+})
+const switchActuator = async () => {
+  if (currentItem.value) {
+    await updateActuatorAPI({
+      device_id: currentItem.value.device_id,
+      is_active: actuatorState.value
+    })
+    currentItem.value.is_active = actuatorState.value
+  }
+}
+watch(actuatorState, () => {
+  switchActuator()
+})
+
+const statusColor = computed(() => statusActive.value ? 'green' : 'red')
 </script>
 
 <template>
@@ -224,20 +266,19 @@ onUnmounted(() => {
     <div v-else-if="currentItem" class="widget-content-wrapper">
 
       <div class="widget-header">
-        <h4 class="widget-title">
-          <n-icon :size="16"
-                  :color="currentItem.online ? 'green' : 'red'">
-            <template v-if="currentItem.online">
-              <PhCheckCircle/>
-            </template>
-            <template v-else>
-              <PhMinusCircle/>
-            </template>
+        <h4
+            class="widget-title"
+            v-if="currentItem.type === 'sensors' || currentItem.type === 'actuators'"
+        >
+          <n-icon :size="16" :color="statusColor">
+            <PhCheckCircle v-if="statusActive"/>
+            <PhMinusCircle v-else/>
           </n-icon>
           <n-button
-              quaternary
               v-if="editable"
-              @click="editItem">
+              quaternary
+              @click="editItem"
+          >
             <template #icon>
               <n-icon size="20">
                 <PhPencil/>
@@ -247,11 +288,17 @@ onUnmounted(() => {
               <formatted-plugin-name :name="currentItem.name"/>
             </strong>
           </n-button>
-          <formatted-plugin-name v-else :name="currentItem.name"/>
-          <span class="status-icon"
-                :class="currentItem.online ? 'online' : 'offline'"
-                v-if="currentItem.name">
-    </span>
+
+          <formatted-plugin-name
+              v-else
+              :name="currentItem.name"
+          />
+          <span
+              class="status-icon"
+              :class="currentItem.online ? 'online' : 'offline'"
+              v-if="currentItem.name"
+          >
+          </span>
         </h4>
         <button
             v-if="editable"
@@ -263,7 +310,12 @@ onUnmounted(() => {
 
 
       <div class="widget-content">
-        <div class="main-display">
+        <div v-if="sensorData?.timestamp"
+             style="font-size: smaller; text-align: left; width: 100%">
+          <n-icon :component="PhClockClockwise"/>
+          {{ new Date(sensorData.timestamp).toLocaleString() }}
+        </div>
+        <div class="main-display" v-if="currentItem.type==='sensors'">
           <div class="value">
             {{
               (typeof sensorData?.value === 'number' && !isNaN(sensorData.value))
@@ -272,12 +324,28 @@ onUnmounted(() => {
                       ? sensorData.value
                       : '—'
             }}
-
           </div>
           <div v-if="displayedUnit" class="unit">{{
               (typeof sensorData?.value === 'number' && !isNaN(sensorData.value)) ? displayedUnit : ''
             }}
           </div>
+        </div>
+        <div class="main-display" v-if="currentItem.type==='actuators'">
+          <n-switch v-model:value="actuatorState">
+            <template #icon>
+              <n-icon
+                  :component="PhPower"
+                  :color="actuatorState ?'green': 'red'"
+                  size="large"
+              />
+            </template>
+            <template #checked>
+              On
+            </template>
+            <template #unchecked>
+              Off
+            </template>
+          </n-switch>
         </div>
         <n-space>
           <n-button
@@ -314,14 +382,19 @@ onUnmounted(() => {
                   {{ sensorData?.device_id || '—' }}
                 </n-descriptions-item>
                 <n-descriptions-item label="Value">
-                  {{
-                    (typeof sensorData?.value === 'number' && !isNaN(sensorData.value))
-                        ? sensorData.value.toFixed(2)
-                        : (typeof sensorData?.value === 'string')
-                            ? sensorData.value
-                            : '—'
-                  }}
-
+                  <template v-if="currentItem.type==='sensors'">
+                    {{
+                      (typeof sensorData?.value === 'number' && !isNaN(sensorData.value))
+                          ? sensorData.value.toFixed(2)
+                          : (typeof sensorData?.value === 'string')
+                              ? sensorData.value
+                              : '—'
+                    }}
+                  </template>
+                  <template v-if="currentItem.type === 'actuators'">
+                    <n-icon :component="PhPower" size="20"
+                            :color="currentItem.is_active ?'green': 'red'"/>
+                  </template>
                 </n-descriptions-item>
                 <n-descriptions-item label="Unit">
                   {{ sensorData?.unit || '—' }}
@@ -333,7 +406,7 @@ onUnmounted(() => {
                 sensorData?.timestamp ? new Date(sensorData.timestamp).toLocaleString() : '—'
               }}
             </n-card>
-            <n-card title="Sensor Data">
+            <n-card title="Sensor Data" v-if="currentItem.type==='sensors'">
               <n-list>
                 <n-list-item
                     v-for="(value, key) in Object.entries(sensorData?.data || {})"
@@ -379,6 +452,7 @@ onUnmounted(() => {
         :initial-data="currentItem"
         @update="onUpdate"
         @close="showModal = false"
+        :type="currentItem.type"
     />
   </div>
 </template>

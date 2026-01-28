@@ -30,6 +30,7 @@ class SensorReadSchema(SensorBaseSchema):
     }
     timestamp: datetime
     value: Optional[Any] = None
+    details: Optional[Dict[str, Any]] = None
     online: bool
 
 

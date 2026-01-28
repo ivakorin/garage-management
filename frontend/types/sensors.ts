@@ -6,8 +6,10 @@ type SensorsType = {
     created_at: string,
     updated_at: string
     timestamp: string
+    value: number | string
     type: "sensors"
     unit: string
+    details: Record<string, any>
     online: boolean
 }
 
@@ -20,10 +22,11 @@ type UpdateSensorType = {
 
 type SensorDataReadType = {
     device_id: string
-    data: Record<string, number>
+    data: Record<string, any>
     timestamp: string
-    value: number
+    value: number | string
     unit: string
+    online: boolean
 }
 
 export type {SensorsType, UpdateSensorType, SensorDataReadType}
