@@ -126,7 +126,6 @@ class ActuatorManager:
                             )
                             continue
                         if check_actuator:
-                            check_actuator.is_active = False
                             update_state = ActuatorUpdate(
                                 device_id=device_id,
                                 is_active=False,
