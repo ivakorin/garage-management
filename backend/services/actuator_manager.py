@@ -125,15 +125,16 @@ class ActuatorManager:
                                 f"Cannot load {device_id}. Please change pin in plugin constructor."
                             )
                             continue
-                        check_actuator.is_active = False
-                        update_state = ActuatorUpdate(
-                            device_id=device_id,
-                            is_active=False,
-                            updated_at=datetime.now(),
-                        )
-                        await ActuatorCRUD.update(
-                            actuator=update_state, session=db_session
-                        )
+                        if check_actuator:
+                            check_actuator.is_active = False
+                            update_state = ActuatorUpdate(
+                                device_id=device_id,
+                                is_active=False,
+                                updated_at=datetime.now(),
+                            )
+                            await ActuatorCRUD.update(
+                                actuator=update_state, session=db_session
+                            )
                         if not check_actuator:
                             actuator_db = ActuatorCreate(
                                 device_id=device_id,
