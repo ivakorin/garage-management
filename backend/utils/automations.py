@@ -71,17 +71,34 @@ class AutomationEngine:
             return False
 
         current_value = await self._get_sensor_value_from_db(sensor_id)
-        logger.info(f"Current value: {current_value}")
         if current_value is not None:
             await self._update_redis_cache(sensor_id, current_value)
 
         if current_value is None:
             return False
+
+        # Обновляем кэш Redis
+        await self._update_redis_cache(sensor_id, current_value)
         prev_value = await self._get_prev_value_from_redis(sensor_id)
-        logger.info(f"Previous value: {prev_value}")
         await self._update_prev_value_in_redis(sensor_id, current_value)
 
-        return prev_value is None or current_value != prev_value
+        # 1. Проверяем, изменилось ли значение (как раньше)
+        value_changed = prev_value is None or current_value != prev_value
+        if not value_changed:
+            return False
+        condition = Condition(
+            sensor_id=sensor_id,
+            operator=trigger.operator,
+            value=trigger.value,
+            hysteresis=trigger.hysteresis,
+        )
+        condition_met = self._evaluate_condition(current_value, condition)
+
+        logger.debug(
+            f"Sensor {sensor_id} changed: {prev_value} → {current_value}. "
+            f"Condition {trigger.operator} {trigger.value}: {'met' if condition_met else 'not met'}"
+        )
+        return condition_met
 
     def _check_time(self, trigger: Trigger) -> bool:
         now = datetime.now().strftime("%H:%M")

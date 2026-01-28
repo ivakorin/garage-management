@@ -38,6 +38,8 @@ class Trigger(BaseModel):
     sensor_id: Optional[str] = None
     time: Optional[str] = None  # HH:MM
     conditions: Optional[List[Condition]] = None
+    operator: Optional[ConditionOperator] = None
+    value: Optional[float] = None
     hysteresis: Optional[Hysteresis] = None
     combine_logic: Literal["AND", "OR"] = "AND"
 
