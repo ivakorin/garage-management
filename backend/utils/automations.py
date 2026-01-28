@@ -51,21 +51,21 @@ class AutomationEngine:
                 if not automation.enabled:
                     continue
 
-                if await self._check_trigger(automation.trigger):
+                if await self._check_trigger(automation.trigger, automation.id):
                     await self._execute_action(automation.action)
 
             await asyncio.sleep(1)
 
-    async def _check_trigger(self, trigger: Trigger) -> bool:
+    async def _check_trigger(self, trigger: Trigger, automation_id: str) -> bool:
         if trigger.type == TriggerType.sensor_change:
-            return await self._check_sensor_change(trigger)
+            return await self._check_sensor_change(trigger, automation_id)
         elif trigger.type == TriggerType.time:
             return self._check_time(trigger)
         elif trigger.type == TriggerType.multi_condition:
             return await self._check_multi_condition(trigger)
         return False
 
-    async def _check_sensor_change(self, trigger: Trigger) -> bool:
+    async def _check_sensor_change(self, trigger: Trigger, automation_id: str) -> bool:
         sensor_id = trigger.sensor_id
         if not sensor_id:
             return False
@@ -79,9 +79,12 @@ class AutomationEngine:
 
         # Обновляем кэш Redis
         await self._update_redis_cache(sensor_id, current_value)
-        prev_value = await self._get_prev_value_from_redis(sensor_id)
-        await self._update_prev_value_in_redis(sensor_id, current_value)
-
+        prev_value = await self._get_prev_value_from_redis(
+            sensor_id=sensor_id, automation_id=automation_id
+        )
+        await self._update_prev_value_in_redis(
+            sensor_id=sensor_id, value=current_value, automation_id=automation_id
+        )
         # 1. Проверяем, изменилось ли значение (как раньше)
         value_changed = prev_value is None or current_value != prev_value
         if not value_changed:
@@ -209,8 +212,11 @@ class AutomationEngine:
             return float(value_str)
         return None
 
-    async def _get_prev_value_from_redis(self, sensor_id: str) -> Optional[float]:
-        value_str = await self.redis_client.get(f"sensor:{sensor_id}:prev_value")
+    async def _get_prev_value_from_redis(
+        self, automation_id: str, sensor_id: str
+    ) -> Optional[float]:
+        key = f"automation:{automation_id}:sensor:{sensor_id}:prev_value"
+        value_str = await self.redis_client.get(key)
         if value_str:
             return float(value_str)
         return None
@@ -218,8 +224,11 @@ class AutomationEngine:
     async def _update_redis_cache(self, sensor_id: str, value: float):
         await self.redis_client.set(f"sensor:{sensor_id}:value", str(value))
 
-    async def _update_prev_value_in_redis(self, sensor_id: str, value: float):
-        await self.redis_client.set(f"sensor:{sensor_id}:prev_value", str(value))
+    async def _update_prev_value_in_redis(
+        self, automation_id: str, sensor_id: str, value: float
+    ):
+        key = f"automation:{automation_id}:sensor:{sensor_id}:prev_value"
+        await self.redis_client.set(key, str(value))
 
     async def _get_sensor_value_from_db(self, sensor_id: str) -> Optional[float]:
         return await SensorDataCRUD.get_value(sensor_id, self.db_session)
