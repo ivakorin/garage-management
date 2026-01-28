@@ -118,6 +118,7 @@ class ActuatorManager:
                         kwargs = {
                             "device_id": device_id,
                             "pin": pin,
+                            "state": False,
                         }
                         if "inverted" in [p.name for p in sig.parameters.values()]:
                             kwargs["inverted"] = inverted
