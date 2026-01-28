@@ -80,8 +80,29 @@ class ActuatorManager:
                             )
 
                         sig = inspect.signature(cls.__init__)
-                        pin = 4
+                        parameters = sig.parameters
+                        pin = None
+                        if "pin" in parameters:
+                            param = parameters["pin"]
+                            if param.default is not param.empty:
+                                pin = param.default  # берём дефолт
+                            else:
+                                # pin обязателен, но мы не можем знать его значение без экземпляра
+                                logger.warning(
+                                    f"Plugin {attr_name} requires 'pin' as positional argument. "
+                                    "Using default pin=4. Consider setting a default in __init__."
+                                )
+                                pin = 4  # резервный дефолт
+                        else:
+                            logger.error(
+                                f"Plugin {attr_name} does not have 'pin' parameter in __init__!"
+                            )
+                            continue  # пропускаем плагин без pin
                         inverted = False
+                        if "inverted" in parameters:
+                            param = parameters["inverted"]
+                            if param.default is not param.empty:
+                                inverted = param.default
 
                         for param_name, param in sig.parameters.items():
                             if param_name == "pin" and param.default is not param.empty:
@@ -125,10 +146,11 @@ class ActuatorManager:
                             logger.info(
                                 f"Created actuator metadata in DB: {device_id} (pin={pin})"
                             )
+                        else:
+                            pin = check_actuator.pin
                         kwargs = {
                             "device_id": device_id,
                             "pin": pin,
-                            "state": False,
                         }
                         if "inverted" in [p.name for p in sig.parameters.values()]:
                             kwargs["inverted"] = inverted
