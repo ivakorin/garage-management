@@ -2,6 +2,7 @@ import importlib
 import inspect
 import logging
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
@@ -9,7 +10,7 @@ from crud.actuators import ActuatorCRUD
 from crud.plugins import Plugins
 from mock.gpio_adapter import is_rpi, GPIO
 from plugins.template import ActuatorPlugin
-from schemas.actuators import ActuatorCreate
+from schemas.actuators import ActuatorCreate, ActuatorUpdate
 from schemas.plugins import PluginBaseSchema
 
 logger = logging.getLogger(__name__)
@@ -103,6 +104,15 @@ class ActuatorManager:
                                 f"Cannot load {device_id}. Please change pin in plugin constructor."
                             )
                             continue
+                        check_actuator.is_active = False
+                        update_state = ActuatorUpdate(
+                            device_id=device_id,
+                            is_active=False,
+                            updated_at=datetime.now(),
+                        )
+                        await ActuatorCRUD.update(
+                            actuator=update_state, session=db_session
+                        )
                         if not check_actuator:
                             actuator_db = ActuatorCreate(
                                 device_id=device_id,
