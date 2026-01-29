@@ -71,7 +71,8 @@ class ActuatorCRUD:
                 return ActuatorRead.model_validate(actuator, from_attributes=True)
             return None
         except Exception as e:
-            await session.rollback()
+            if session.in_transaction():
+                await session.rollback()
             logger.error(e)
 
     @staticmethod
