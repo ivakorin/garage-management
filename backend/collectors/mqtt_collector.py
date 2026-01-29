@@ -39,7 +39,7 @@ class MQTTCollector(BaseCollector):
         self._buffer = deque()
         self._last_flush = 0.0
         self._flush_interval = 5.0  # seconds
-        self._batch_size = 100
+        self._batch_size = 10
         self._topic_cache = {}
 
     async def collect(self):
