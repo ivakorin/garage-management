@@ -22,23 +22,27 @@ from services.mqtt_helper import create_mqtt_client
 from services.plugins import load_plugins
 from utils.automations import AutomationEngine
 from utils.dependencies import setup_plugin_dependencies, set_automation_engine
+from utils.profiler import AppProfiler
 
 logging.basicConfig(level=settings.log.level)
 logger = logging.getLogger(__name__)
 
-
 plugins = {}
+
+profiler = AppProfiler(enabled=settings.profiling.enabled)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    setup_plugin_dependencies()
-    collect_tasks: List[asyncio.Task] = []
-    redis_client: Optional[redis.Redis] = None
-    mqtt_client: Optional[AsyncMQTTClient] = None
-    actuator_manager: Optional[ActuatorManager] = None
-
     try:
+        await profiler.start()
+
+        setup_plugin_dependencies()
+        collect_tasks: List[asyncio.Task] = []
+        redis_client: Optional[redis.Redis] = None
+        mqtt_client: Optional[AsyncMQTTClient] = None
+        actuator_manager: Optional[ActuatorManager] = None
+
         await init_db()
         logger.info("Database initialized")
 
@@ -99,6 +103,8 @@ async def lifespan(app: FastAPI):
         raise
 
     finally:
+        await profiler.stop_and_save()
+
         if automation_engine:
             automation_engine.running = False
             await automation_engine.cleanup()
@@ -127,7 +133,7 @@ async def lifespan(app: FastAPI):
                     await actuator.cleanup()
                 except Exception as e:
                     logger.error(f"Error cleaning up actuator {actuator.device_id}: {e}")
-                    logger.info("Application shutdown complete")
+            logger.info("Application shutdown complete")
 
 
 app = FastAPI(

@@ -47,12 +47,17 @@ class AutomationEngine:
 
     async def run(self):
         while self.running:
-            for automation in self.automations.values():
-                if not automation.enabled:
-                    continue
+            tasks = [
+                self._check_trigger(automation.trigger, automation.id)
+                for automation in self.automations.values()
+                if automation.enabled
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                if await self._check_trigger(automation.trigger, automation.id):
-                    await self._execute_action(automation.action)
+            for i, result in enumerate(results):
+                if result is True:
+                    action = list(self.automations.values())[i].action
+                    await self._execute_action(action)
 
             await asyncio.sleep(1)
 

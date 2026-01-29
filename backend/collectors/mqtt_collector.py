@@ -1,14 +1,14 @@
 import asyncio
 import json
 import logging
+from collections import deque
 from datetime import datetime
 from typing import Optional
 
 import redis.asyncio as redis
 
 from core.settings import settings
-from crud.sensors import SensorDataCRUD
-from schemas.sensors import SensorMessage, SensoeUpdateSchema
+from schemas.sensors import SensorMessage
 from services.base_collector import BaseCollector
 from services.batch_saver import save_batch_to_db
 from services.mqtt_client import AsyncMQTTClient
@@ -36,6 +36,11 @@ class MQTTCollector(BaseCollector):
     ):
         super().__init__(mqtt_client=mqtt_client, redis_client=redis_client)
         self.subscription_topics = subscription_topics or ["devices/#"]
+        self._buffer = deque()
+        self._last_flush = 0.0
+        self._flush_interval = 1.0  # seconds
+        self._batch_size = 100
+        self._topic_cache = {}
 
     async def collect(self):
         self._is_running = True
@@ -65,82 +70,69 @@ class MQTTCollector(BaseCollector):
 
     async def _on_message(self, topic: str, payload: bytes, qos: int, properties):
         logger.debug(f"[MQTT] Received raw message: topic={topic}, size={len(payload)} B")
-        device_id = self._extract_device_id(topic)
-        try:
-            payload_str = payload.decode("utf-8")
-        except UnicodeDecodeError as e:
-            logger.error(f"[MQTT] Failed to decode payload (topic={topic}): {e}")
+        if topic not in self._topic_cache:
+            self._topic_cache[topic] = self._extract_device_id(topic)
+        device_id = self._topic_cache[topic]
+        if not device_id:
+            logger.warning(f"[MQTT] Cannot extract device_id from topic: {topic}")
             return
-        split_topic = topic.split("/")
-        if "online" in split_topic:
-            try:
-                online = json.loads(payload_str).strip().lower() == "true"
-            except AttributeError as e:
-                online = payload_str
-            devices = await SensorDataCRUD.search(
-                pattern=device_id, session=self.db_session
+        try:
+            data = json.loads(payload)  # Работает напрямую с bytes
+        except json.JSONDecodeError as e:
+            logger.error(
+                f"[MQTT] Invalid JSON in payload (topic={topic}): {e}, raw={payload}"
             )
-            if not devices:
-                logger.warning(f"[MQTT] Cannot find device {device_id}")
-                return
-            for device in devices:
-                update_online = SensoeUpdateSchema(
-                    device_id=device,
-                    online=online,
-                    updated_at=datetime.now(),
-                )
-                try:
-                    await SensorDataCRUD.update(
-                        data=update_online, session=self.db_session
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"[MQTT] Unexpected error when try to update device state: {e}"
-                    )
-                    continue
             return
-        try:
-            try:
-                data = json.loads(payload_str)
-            except json.JSONDecodeError as e:
-                logger.error(
-                    f"[MQTT] Invalid JSON in payload (topic={topic}): {e}, raw={payload_str}"
-                )
-                return
-            if not device_id:
-                logger.warning(f"[MQTT] Cannot extract device_id from topic: {topic}")
-                return
-            logger.debug(f"[MQTT] Extracted device_id={device_id} from topic={topic}")
-            for key, value in data.items():
-                if key == "online":
-                    continue
-                message = SensorMessage(
-                    device_id=f"{str(key.upper())}_{device_id}",
-                    timestamp=datetime.now().isoformat(),
-                    data=value,
-                    value=value.get("value"),
-                    unit=value.get("unit"),
-                    online=True,
-                )
-                await asyncio.gather(
-                    publish_to_redis(self.redis_client, message),
-                    save_batch_to_db(
-                        self.db_session,
-                        [message],
-                        retention_days=settings.app_settings.keep_data,
-                    ),
-                )
-                logger.debug(f"[MQTT] Message successfully published to redis: {message}")
-        except Exception as e:
-            logger.critical(f"[MQTT] Unexpected error in _on_message: {e}", exc_info=True)
+        messages = []
+        redis_tasks = []
+        for key, value in data.items():
+            if key == "online":
+                continue
+
+            message = SensorMessage(
+                device_id=f"{key.upper()}_{device_id}",
+                timestamp=datetime.now().isoformat(),
+                data=value,
+                value=value.get("value"),
+                unit=value.get("unit"),
+                online=True,
+            )
+            messages.append(message)
+            redis_tasks.append(publish_to_redis(self.redis_client, message))
+
+        self._buffer.extend(messages)
+        current_time = asyncio.get_event_loop().time()
+
+        if (
+            len(self._buffer) >= self._batch_size
+            or current_time - self._last_flush >= self._flush_interval
+        ):
+            await self._flush_buffer()
+            self._last_flush = current_time
+        if redis_tasks:
+            await asyncio.gather(*redis_tasks, return_exceptions=True)
 
     def _extract_device_id(self, topic: str) -> Optional[str]:
         parts = topic.strip("/").split("/")
-        if len(parts) >= 2:
-            return parts[-2]
-        return None
+        return parts[-2] if len(parts) >= 2 else None
+
+    async def _flush_buffer(self):
+        if not self._buffer:
+            return
+        messages = list(self._buffer)
+        self._buffer.clear()
+        try:
+            await save_batch_to_db(
+                self.db_session,
+                messages,
+                retention_days=settings.app_settings.keep_data,
+            )
+        except Exception as e:
+            logger.error(f"[MQTT] Failed to save batch to DB: {e}", exc_info=True)
 
     async def _cleanup(self):
         await super()._cleanup()
+        if self._buffer:
+            await self._flush_buffer()
         for topic in self.subscription_topics:
             await safe_unsubscribe(self.mqtt_client, topic)

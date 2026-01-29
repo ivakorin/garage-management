@@ -47,6 +47,9 @@ class API(BaseSettings):
 class AppSettings(BaseSettings):
     keep_data: int = 7
 
+class Profiling(BaseSettings):
+    enabled: bool
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -65,6 +68,7 @@ class Settings(BaseSettings):
     mqtt: MQTT
     app_settings: AppSettings
     collector: Collector
+    profiling: Profiling
 
 
 settings = Settings()

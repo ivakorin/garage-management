@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud.sensors import SensorDataCRUD
 from db.database import get_async_session
-from schemas.sensors import SensorReadSchema, SensoeUpdateSchema, SensorDataReadSchema
+from schemas.sensors import SensorReadSchema, SensorUpdateSchema, SensorDataReadSchema
 
 router = APIRouter(prefix="/sensors", tags=["sensors"])
 
@@ -37,7 +37,7 @@ async def get_avg_value(
 
 @router.patch("/update", response_model=SensorReadSchema)
 async def update_sensor(
-    sensor: SensoeUpdateSchema, session: AsyncSession = Depends(get_async_session)
+    sensor: SensorUpdateSchema, session: AsyncSession = Depends(get_async_session)
 ):
     sensor.updated_at = datetime.now()
     return await SensorDataCRUD.update(data=sensor, session=session)

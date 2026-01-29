@@ -13,7 +13,6 @@ from core.settings import settings
 router = APIRouter(tags=["websocket"])
 logger = logging.getLogger(__name__)
 
-# Оптимизированный Redis-клиент
 redis_client = redis.Redis(
     host=settings.redis.host,
     port=settings.redis.port,
@@ -23,7 +22,6 @@ redis_client = redis.Redis(
     socket_connect_timeout=2,
 )
 
-# Использование WeakSet для более эффективного хранения подключений
 active_connections: Dict[WebSocket, Set[str]] = {}
 
 
@@ -140,20 +138,19 @@ async def redis_listener(websocket: WebSocket):
                                 message_buffer.clear()
 
                         except (json.JSONDecodeError, KeyError) as e:
-                            logger.warning(f"Ошибка парсинга данных: {e}")
+                            logger.warning(f"Data parsing error: {e}")
 
                 except asyncio.CancelledError:
-                    logger.info("Redis listener остановлен")
+                    logger.info("Redis listener is stopped")
                     break
 
                 except Exception as e:
-                    logger.error(f"Критическая ошибка: {e}")
-                    await asyncio.sleep(1.0)  # Переподключение
+                    logger.error(f"Critical error: {e}")
+                    await asyncio.sleep(1.0)
 
         finally:
-            # Гарантированное освобождение ресурсов
             await pubsub.unsubscribe("sensor_updates")
-            logger.info("Redis listener завершил работу")
+            logger.info("Redis listener has finished its work")
 
 
 async def send_buffered_messages(websocket: WebSocket, messages: list):

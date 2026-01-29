@@ -34,7 +34,7 @@ class SensorReadSchema(SensorBaseSchema):
     online: bool
 
 
-class SensoeUpdateSchema(BaseModel):
+class SensorUpdateSchema(BaseModel):
     id: Optional[int] = None
     device_id: str
     name: Optional[str] = None

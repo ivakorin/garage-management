@@ -19,7 +19,6 @@ def setup_plugin_dependencies():
         sys.path.insert(0, lib_path_str)
         logger.info(f"[DEP] Added to sys.path: {lib_path_str}")
 
-
     REQUIRED_PACKAGES = ["RPi.GPIO"]
 
     for package in REQUIRED_PACKAGES:
@@ -36,15 +35,17 @@ def setup_plugin_dependencies():
                 except ImportError:
                     # 3. Если не получилось — устанавливаем
                     logger.info(f"[DEP] Installing {package} to {lib_path_str}")
-                    subprocess.check_call([
-                        sys.executable,
-                        "-m",
-                        "pip",
-                        "install",
-                        "--target",
-                        lib_path_str,
-                        package
-                    ])
+                    subprocess.check_call(
+                        [
+                            sys.executable,
+                            "-m",
+                            "pip",
+                            "install",
+                            "--target",
+                            lib_path_str,
+                            package,
+                        ]
+                    )
 
                     # 4. После установки — принудительно перезагружаем модуль
                     importlib.invalidate_caches()
@@ -52,11 +53,12 @@ def setup_plugin_dependencies():
                         module = __import__(package)  # Прямой импорт
                         logger.info(f"[DEP] {package} installed and imported")
                     except ImportError as e:
-                        # 5. Если всё равно не работает — проверяем структуру
-                        logger.error(f"[DEP] Failed to import {package} after install: {e}")
-                        # Выводим содержимое lib для отладки
-                        logger.debug(f"[DEP] Contents of {lib_path}: {list(lib_path.iterdir())}")
-                        raise
+                        logger.error(
+                            f"[DEP] Failed to import {package} after install: {e}"
+                        )
+                        logger.debug(
+                            f"[DEP] Contents of {lib_path}: {list(lib_path.iterdir())}"
+                        )
 
             # 6. Сохраняем в globals
             if package == "RPi.GPIO":
@@ -67,7 +69,6 @@ def setup_plugin_dependencies():
 
         except Exception as e:
             logger.error(f"[DEP] Error with {package}: {e}", exc_info=True)
-
 
 
 _automation_engine: Optional[AutomationEngine] = None

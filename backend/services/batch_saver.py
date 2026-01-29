@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.settings import settings
 from crud.sensors import SensorDataCRUD
 from models import Sensor, SensorData
-from schemas.sensors import SensorMessage, SensoeUpdateSchema
+from schemas.sensors import SensorMessage, SensorUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ async def save_batch_to_db(
                 db_session.add(device)
                 devices[msg.device_id] = device
             else:
-                updated_online = SensoeUpdateSchema(
+                updated_online = SensorUpdateSchema(
                     device_id=msg.device_id,
                     online=msg.online,
                     updated_at=datetime.now(),

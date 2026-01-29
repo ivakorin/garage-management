@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models import SensorData, Sensor
 from schemas.sensors import (
     SensorReadSchema,
-    SensoeUpdateSchema,
+    SensorUpdateSchema,
     SensorDataReadSchema,
 )
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class SensorDataCRUD:
 
     @staticmethod
-    async def update(data: SensoeUpdateSchema, session: AsyncSession) -> SensorReadSchema:
+    async def update(data: SensorUpdateSchema, session: AsyncSession) -> SensorReadSchema:
         try:
             update_stmt = (
                 update(Sensor)
@@ -55,7 +55,7 @@ class SensorDataCRUD:
             logger.error(f"Error dropping state: {e}", exc_info=True)
 
     @staticmethod
-    async def _update_core(data: SensoeUpdateSchema, session: AsyncSession):
+    async def _update_core(data: SensorUpdateSchema, session: AsyncSession):
         """
         Базовая логика обновления — без commit/rollback.
         Используется в batch-операциях.
@@ -157,7 +157,6 @@ class SensorDataCRUD:
             raise HTTPException(status_code=404, detail="Device not found")
 
         sensor, sensor_data = row
-        print(sensor)
         data_dict = {}
         if sensor_data:
             try:
