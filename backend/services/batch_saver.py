@@ -60,12 +60,12 @@ async def save_batch_to_db(
         for msg in messages:
             # Проверка существования сенсора
             if msg.device_id not in sensor_map:
-                logger.debug(f"No sensor {msg.device_id} in database, try to save")
+                logger.debug(f"[BATCH SAVER]No sensor {msg.device_id} in database, try to save")
                 device = Sensor(device_id=msg.device_id, name=msg.device_id)
                 db_session.add(device)
                 sensor_map[msg.device_id] = device
             else:
-                logger.debug(f"Sensor {msg.device_id} found in database, update data")
+                logger.debug(f"[BATCH SAVER]Sensor {msg.device_id} found in database, update data")
                 to_update_online.append(
                     SensorUpdateSchema(
                         device_id=msg.device_id,
