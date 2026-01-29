@@ -118,7 +118,7 @@ const loadItem = async (): Promise<SensorsType | ActuatorType> => {
   ws.onSensorUpdate(response.device_id, (data) => {
     sensorData.value = data;
     if (currentItem.value && currentItem.value.type === 'actuators') {
-      actuatorState.value = data.value
+      actuatorState.value = Boolean(data.value)
     }
   });
 
@@ -244,8 +244,10 @@ const switchActuator = async () => {
     currentItem.value.is_active = actuatorState.value
   }
 }
-watch(actuatorState, () => {
-  switchActuator()
+watch(actuatorState, (oldValue, newValue) => {
+  if (oldValue !== newValue) {
+    switchActuator()
+  }
 })
 
 const statusColor = computed(() => statusActive.value ? 'green' : 'red')
