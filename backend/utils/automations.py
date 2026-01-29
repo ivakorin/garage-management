@@ -251,6 +251,7 @@ class AutomationEngine:
             data=command,
             value=1 if state else 0,
             unit="boolean",
+            online=state,
         )
         if not device:
             logger.error(f"Device not found: {device_id}")

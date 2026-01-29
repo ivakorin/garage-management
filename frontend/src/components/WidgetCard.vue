@@ -117,6 +117,9 @@ const loadItem = async (): Promise<SensorsType | ActuatorType> => {
   // Подписка на обновления
   ws.onSensorUpdate(response.device_id, (data) => {
     sensorData.value = data;
+    if (currentItem.value && currentItem.value.type === 'actuators') {
+      actuatorState.value = data.value
+    }
   });
 
   // Проверка подписок через 3 секунды
