@@ -55,7 +55,7 @@ class MQTTCollector(BaseCollector):
             logger.info("MQTT client started, listening to '/devices/#'")
 
             while self._is_running:
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(1)
 
         except Exception as e:
             logger.error(f"MQTT Client Error: {e}")
