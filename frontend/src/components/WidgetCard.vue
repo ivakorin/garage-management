@@ -16,7 +16,7 @@ import {SensorWebSocket} from '../ws/webSocket.ts'
 import SensorHistoryChart from "../dialogs/SensorHistoryChart.vue"
 import unitSymbolsJson from '../misc/measure_units/units.json';
 import type {ActuatorType, SensorDataType} from "../../types/actuators.ts";
-import {readActuatorAPI, updateActuatorAPI} from "../api/actuators.ts";
+import {readActuatorAPI, switchActuatorAPI} from "../api/actuators.ts";
 
 onMounted(() => {
   unitSymbols.value = unitSymbolsJson;
@@ -237,9 +237,9 @@ const statusActive = computed(() => {
 })
 const switchActuator = async () => {
   if (currentItem.value) {
-    await updateActuatorAPI({
+    await switchActuatorAPI({
       device_id: currentItem.value.device_id,
-      is_active: actuatorState.value
+      switch: actuatorState.value
     })
     currentItem.value.is_active = actuatorState.value
   }

@@ -11,9 +11,26 @@ const updateActuatorAPI = async (params: UpdateActuatorType): Promise<ActuatorTy
     return response.data;
 };
 
+const switchActuatorAPI = async (params: {
+    device_id: string,
+    switch: boolean
+}): Promise<boolean> => {
+    const response = await api.patch(
+        `actuators/switch/${encodeURIComponent(params.device_id)}`,
+        null,
+        {
+            params: {
+                switch: params.switch
+            },
+        }
+    );
+    return response.data;
+};
+
+
 const readActuatorAPI = async (device_id: string): Promise<ActuatorType> => {
     const response = await api.get(`actuators/get/${device_id}`);
     return response.data;
 };
 
-export {fetchActuatorsAPI, updateActuatorAPI, readActuatorAPI};
+export {fetchActuatorsAPI, updateActuatorAPI, readActuatorAPI, switchActuatorAPI};

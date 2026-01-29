@@ -23,6 +23,16 @@ async def actuators_update(
     return await ActuatorCRUD.update(actuator=actuator, session=session)
 
 
+@router.patch("/switch/{device_id}", response_model=bool)
+async def actuators_switch(
+    device_id: str,
+    switch: bool,
+    engine: AutomationEngine = Depends(get_automation_engine),
+):
+    await engine._control_device(device_id=device_id, state=switch)
+    return switch
+
+
 @router.get("/get/all", response_model=Optional[List[ActuatorRead]])
 async def get_sensors(session: AsyncSession = Depends(get_async_session)):
     return await ActuatorCRUD.get_all(session)
