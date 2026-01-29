@@ -27,6 +27,7 @@ let chartOption = ref<EChartsOption>({})
 
 onMounted(() => {
   fetchData()
+  console.log('Mounted')
 })
 
 watch(

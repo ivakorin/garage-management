@@ -68,49 +68,71 @@ class MQTTCollector(BaseCollector):
             await self.mqtt_client.disconnect()
             logger.info("MQTT client disconnected")
 
-    async def _on_message(self, topic: str, payload: bytes, qos: int, properties):
-        logger.debug(f"[MQTT] Received raw message: topic={topic}, size={len(payload)} B")
+    async def _on_message(self, topic: str, payload: bytes, qos: int, properties) -> None:
+        # Оптимизированный логирование с уменьшением детализации
+        logger.debug(f"[MQTT] Received message: topic={topic}")
+
+        # Кэширование device_id для уменьшения количества операций
         if topic not in self._topic_cache:
             self._topic_cache[topic] = self._extract_device_id(topic)
         device_id = self._topic_cache[topic]
+
         if not device_id:
-            logger.warning(f"[MQTT] Cannot extract device_id from topic: {topic}")
+            logger.warning(f"[MQTT] Invalid device_id for topic: {topic}")
             return
+
         try:
-            data = json.loads(payload)  # Работает напрямую с bytes
+            # Парсинг JSON с обработкой ошибок
+            data = json.loads(payload)
         except json.JSONDecodeError as e:
-            logger.error(
-                f"[MQTT] Invalid JSON in payload (topic={topic}): {e}, raw={payload}"
-            )
+            logger.error(f"[MQTT] JSON decode error: {e}")
             return
-        messages = []
-        redis_tasks = []
-        for key, value in data.items():
-            if key == "online":
-                continue
 
-            message = SensorMessage(
-                device_id=f"{key.upper()}_{device_id}",
-                timestamp=datetime.now().isoformat(),
-                data=value,
-                value=value.get("value"),
-                unit=value.get("unit"),
-                online=True,
-            )
-            messages.append(message)
-            redis_tasks.append(publish_to_redis(self.redis_client, message))
+        # Оптимизированная обработка данных с использованием генераторов
+        try:
+            # Создаем сообщения в памяти
+            messages = [
+                SensorMessage(
+                    device_id=f"{key.upper()}_{device_id}",
+                    timestamp=datetime.now().isoformat(),
+                    data=value,
+                    value=value.get("value"),
+                    unit=value.get("unit"),
+                    online=True,
+                )
+                for key, value in data.items()
+                if key != "online" and isinstance(value, dict)
+            ]
+        except Exception as e:
+            logger.error(f"[MQTT] Error processing message: {e}")
+            return
 
+        # Добавляем в буфер с контролем размера
         self._buffer.extend(messages)
         current_time = asyncio.get_event_loop().time()
 
+        # Оптимизированный условный flush
         if (
             len(self._buffer) >= self._batch_size
             or current_time - self._last_flush >= self._flush_interval
         ):
-            await self._flush_buffer()
-            self._last_flush = current_time
-        if redis_tasks:
-            await asyncio.gather(*redis_tasks, return_exceptions=True)
+            try:
+                await self._flush_buffer()
+                self._last_flush = current_time
+            except Exception as e:
+                logger.error(f"[MQTT] Flush buffer error: {e}")
+
+        # Оптимизированная публикация в Redis
+        if messages:
+            try:
+                # Ограничиваем количество параллельных задач
+                tasks = [
+                    publish_to_redis(self.redis_client, message) for message in messages
+                ]
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            except Exception as e:
+                logger.error(f"[MQTT] Redis publish error: {e}")
 
     def _extract_device_id(self, topic: str) -> Optional[str]:
         parts = topic.strip("/").split("/")

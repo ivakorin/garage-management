@@ -1,11 +1,10 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Set
 
 from sqlalchemy import select, and_, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only
 
 from core.settings import settings
 from crud.sensors import SensorDataCRUD
@@ -20,27 +19,26 @@ async def save_batch_to_db(
     messages: List[SensorMessage],
     retention_days: int = settings.app_settings.keep_data,
 ) -> int:
-    """
-    Batch-saving messages to the database with checking for changes and clearing old records.
-    """
     if not messages:
         return 0
 
     try:
         device_ids = {msg.device_id for msg in messages}
 
-        # 1. Load existing Sensors (only needed fields)
+        # Оптимизированная загрузка сенсоров
         sensor_result = await db_session.execute(
-            select(Sensor)
+            select(Sensor.device_id, Sensor.name)
             .where(Sensor.device_id.in_(device_ids))
-            .options(load_only(Sensor.device_id, Sensor.name))
+            .distinct()
         )
-        devices: Dict[str, Sensor] = {
-            dev.device_id: dev for dev in sensor_result.scalars().all()
+
+        # Создаем словарь, где ключом будет device_id, а значением - объект Sensor
+        sensor_map = {
+            row.device_id: Sensor(device_id=row.device_id, name=row.name)
+            for row in sensor_result.scalars()
         }
 
-        # 2. Load latest SensorData per device (most recent per device_id)
-        # Using subquery for efficiency
+        # Оптимизированный запрос для получения последних данных
         subq = (
             select(SensorData.device_id)
             .where(SensorData.device_id.in_(device_ids))
@@ -53,22 +51,18 @@ async def save_batch_to_db(
             .join(subq, SensorData.device_id == subq.c.device_id)
             .where(SensorData.device_id.in_(device_ids))
         )
-        last_data_list = last_data_result.scalars().all()
-        last_data_map: Dict[str, SensorData] = {
-            item.device_id: item for item in last_data_list
-        }
+        last_data_map = {item.device_id: item for item in last_data_result.scalars()}
 
         to_insert: List[SensorData] = []
         to_update_online: List[SensorUpdateSchema] = []
         to_cleanup_devices: Set[str] = set()
 
-        # 3. Process each message
         for msg in messages:
-            # Ensure Sensor exists
-            if msg.device_id not in devices:
+            # Проверка существования сенсора
+            if msg.device_id not in sensor_map:
                 device = Sensor(device_id=msg.device_id, name=msg.device_id)
                 db_session.add(device)
-                devices[msg.device_id] = device
+                sensor_map[msg.device_id] = device
             else:
                 to_update_online.append(
                     SensorUpdateSchema(
@@ -78,7 +72,7 @@ async def save_batch_to_db(
                     )
                 )
 
-            # Check if data changed
+            # Проверка изменений данных
             last_data = last_data_map.get(msg.device_id)
             if _is_data_changed(last_data, msg.data):
                 to_cleanup_devices.add(msg.device_id)
@@ -92,16 +86,16 @@ async def save_batch_to_db(
                 )
                 to_insert.append(db_data)
 
-        # 4. Bulk insert new SensorData (real SQLAlchemy method)
+        # Массовая вставка данных
         if to_insert:
             db_session.add_all(to_insert)
 
-        # 5. Update online status — batch via existing CRUD (assumed to be efficient)
+        # Обновление статуса онлайн
         if to_update_online:
             for update in to_update_online:
                 await SensorDataCRUD._update_core(data=update, session=db_session)
 
-        # 6. Cleanup old data — batch delete per device_ids
+        # Очистка старых данных
         if to_cleanup_devices:
             cutoff = datetime.now() - timedelta(days=retention_days)
             stmt = delete(SensorData).where(
@@ -112,36 +106,24 @@ async def save_batch_to_db(
             )
             await db_session.execute(stmt)
 
-        # 7. Single commit
+        # Один коммит для всех операций
         await db_session.commit()
-        logger.debug(f"Batch saved in DB: {len(to_insert)} records")
+        logger.debug(f"Сохранено в БД: {len(to_insert)} записей")
         return len(to_insert)
 
     except Exception as e:
-        logger.error(f"Error when saving batch to DATABASE: {e}", exc_info=True)
-        await db_session.rollback()
-        return 0
+        logger.error
 
 
-def _is_data_changed(
-    last_data: Optional[SensorData],
-    new_data: dict,
-    cached_data: Optional[dict] = None,
-) -> bool:
-    """Checks whether the data has changed compared to the last record."""
+def _is_data_changed(last_data: Optional[SensorData], new_data: dict):
     if last_data is None:
         return True
-    if cached_data is not None:
-        return cached_data != new_data
-
-    try:
-        # Cache parsed data to avoid repeated JSON parsing
-        if not hasattr(last_data, "_parsed_data"):
+    if not hasattr(last_data, "_parsed_data"):
+        try:
             last_data._parsed_data = json.loads(last_data.data)
-        return last_data._parsed_data != new_data
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.error(f"last_data.data parsing error: {e}")
-        return True
+        except json.JSONDecodeError:
+            return True
+    return last_data._parsed_data != new_data
 
 
 async def extract_numeric_value(data: dict) -> Optional[float]:

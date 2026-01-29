@@ -429,6 +429,7 @@ const statusColor = computed(() => statusActive.value ? 'green' : 'red')
           </div>
         </n-modal>
         <sensor-history-chart
+            v-if="showHistory"
             :device-id="currentItem?.device_id || ''"
             v-model="showHistory"
             :device-name="currentItem?.name || ''"
