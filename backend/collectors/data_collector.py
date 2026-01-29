@@ -115,8 +115,8 @@ class DataCollector(BaseCollector):
                 if not data_received:
                     await self._sleep_if_no_data(data_received, delay=1.0)
                 now = asyncio.get_event_loop().time()
-                batch_ready = len(self._batch) >= 5 or (
-                    self._batch and (now - self._last_batch_check) >= 2.0
+                batch_ready = len(self._batch) >= 50 or (
+                    self._batch and (now - self._last_batch_check) >= 5.0
                 )
 
                 if batch_ready:
