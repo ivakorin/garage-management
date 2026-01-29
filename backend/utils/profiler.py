@@ -12,15 +12,15 @@ class AppProfiler:
         self.profiler = Profiler()
 
     async def start(self):
-        print("start profiling")
         logger.debug("Method called")
         if self.enabled:
+            print("start profiling")
             logger.debug("Start profiler")
             self.profiler.start()
 
     async def stop_and_save(self):
-        print("stop profiling")
         logger.debug("Method stop called")
+        print("stop profiling")
         if self.enabled:
             logger.debug("Stop profiler")
             self.profiler.stop()
