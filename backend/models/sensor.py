@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Text, Index
+from sqlalchemy import Text, Index, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.database import Base
@@ -29,10 +29,11 @@ class SensorData(Base):
     __tablename__ = "sensors_data"
     __table_args__ = (
         Index(
-            "idx_sensor_device_timestamp",
+            "idx_sensors_data_optimized",
+            "unit",
             "device_id",
-            "timestamp",
-            postgresql_using="btree",
+            text("timestamp DESC"),
+            "value",
         ),
     )
     id: Mapped[int] = mapped_column(primary_key=True)

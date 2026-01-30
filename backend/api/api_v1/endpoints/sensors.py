@@ -35,6 +35,15 @@ async def get_avg_value(
     return await SensorDataCRUD.get_av_value(session=session, measure_unit=measure_unit)
 
 
+@router.get("/get/latest_avg_value/{measure_unit}", response_model=Optional[float])
+async def get_average_latest_value(
+    measure_unit: str, session: AsyncSession = Depends(get_async_session)
+):
+    return await SensorDataCRUD.get_average_latest_value(
+        session=session, measure_unit=measure_unit
+    )
+
+
 @router.patch("/update", response_model=SensorReadSchema)
 async def update_sensor(
     sensor: SensorUpdateSchema, session: AsyncSession = Depends(get_async_session)

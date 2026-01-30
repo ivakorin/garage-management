@@ -20,11 +20,7 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 DATABASE_URL = settings.database.url
 
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
-    poolclass=AsyncAdaptedQueuePool,
-)
+engine = create_async_engine(DATABASE_URL, echo=False, poolclass=AsyncAdaptedQueuePool)
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:

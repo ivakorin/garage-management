@@ -213,6 +213,50 @@ class SensorDataCRUD:
             logger.error(f"Error fetching av value: {e}")
 
     @staticmethod
+    async def get_average_latest_value(
+        measure_unit: str, session: AsyncSession
+    ) -> Optional[float]:
+        """
+        Returns the average of the last value of all sensors with the specified unit of measurement.
+        Args:
+            measure_unit: unit of measurement (for example, '°C', '%')
+            session: asynchronous SQLAlchemy session
+        Returns:
+            The average value (float) or None if there is no data
+        """
+        # Subquery: getting the last value for each sensor
+        latest_values = (
+            select(
+                SensorData.device_id,
+                func.max(SensorData.timestamp).label("max_timestamp"),
+            )
+            .where(SensorData.unit == measure_unit)
+            .group_by(SensorData.device_id)
+            .subquery()
+        )
+
+        # Main query: combine with the latest values and calculate the average
+        stmt = (
+            select(func.avg(SensorData.value))
+            .join_from(
+                latest_values,
+                SensorData,
+                (SensorData.device_id == latest_values.c.device_id)
+                & (SensorData.timestamp == latest_values.c.max_timestamp),
+            )
+            .where(SensorData.unit == measure_unit)
+        )
+
+        try:
+            result = await session.execute(stmt)
+            avg_value = result.scalar()
+            return float(avg_value) if avg_value is not None else None
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error calculating average latest value: {e}")
+            return None
+
+    @staticmethod
     async def get_value(device_id: str, session: AsyncSession) -> Optional[float]:
         stmt = (
             select(SensorData.value)
