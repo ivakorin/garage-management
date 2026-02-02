@@ -9,7 +9,7 @@ class SensorMessage(BaseModel):
     timestamp: str
     data: Dict[str, Any]
     value: Optional[float | int] = None
-    unit: str
+    unit: Optional[str] = None
     online: Optional[bool] = None
 
 

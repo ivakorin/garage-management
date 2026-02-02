@@ -69,10 +69,7 @@ class MQTTCollector(BaseCollector):
             logger.info("MQTT client disconnected")
 
     async def _on_message(self, topic: str, payload: bytes, qos: int, properties) -> None:
-        # Оптимизированный логирование с уменьшением детализации
         logger.debug(f"[MQTT] Received message: topic={topic}")
-
-        # Кэширование device_id для уменьшения количества операций
         if topic not in self._topic_cache:
             self._topic_cache[topic] = self._extract_device_id(topic)
         device_id = self._topic_cache[topic]
@@ -82,57 +79,94 @@ class MQTTCollector(BaseCollector):
             return
 
         try:
-            # Парсинг JSON с обработкой ошибок
             data = json.loads(payload)
         except json.JSONDecodeError as e:
             logger.error(f"[MQTT] JSON decode error: {e}")
             return
 
-        # Оптимизированная обработка данных с использованием генераторов
+        messages = []
+        online_status = True  # дефолт
+
         try:
-            # Создаем сообщения в памяти
-            messages = [
-                SensorMessage(
-                    device_id=f"{key.upper()}_{device_id}",
-                    timestamp=datetime.now().isoformat(),
-                    data=value,
-                    value=value.get("value"),
-                    unit=value.get("unit"),
-                    online=True,
-                )
-                for key, value in data.items()
-                if key != "online" and isinstance(value, dict)
-            ]
+            if "online" in data:
+                online_val = data["online"]
+                if isinstance(online_val, str):
+                    online_status = online_val.lower() == "true"
+                elif isinstance(online_val, bool):
+                    online_status = online_val
+                else:
+                    logger.warning(
+                        f"[MQTT] Unexpected type for 'online' ({type(online_val)}) in topic {topic}"
+                    )
+                    online_status = False
+            for sensor_key, sensor_value in data.items():
+                if sensor_key == "online":
+                    continue
+                if not isinstance(sensor_value, dict):
+                    logger.debug(
+                        f"[MQTT] Skip non-dict item '{sensor_key}' in topic {topic}"
+                    )
+                    continue
+                for param_key, param_value in sensor_value.items():
+                    if not isinstance(param_value, dict):
+                        logger.debug(
+                            f"[MQTT] Skip non-dict param '{param_key}' in {sensor_key} for {device_id}"
+                        )
+                        continue
+                    value = param_value.get("value")
+                    unit = param_value.get("unit")
+
+                    if unit is None:
+                        logger.warning(
+                            f"[MQTT] Missing 'unit' for {sensor_key}.{param_key} in device {device_id}"
+                        )
+                        continue
+                    full_device_id = (
+                        f"{sensor_key.upper()}_{param_key.upper()}_{device_id}"
+                    )
+                    try:
+                        msg = SensorMessage(
+                            device_id=full_device_id,
+                            timestamp=datetime.now().isoformat(),
+                            data=param_value,
+                            value=value,
+                            unit=unit,
+                            online=online_status,
+                        )
+                        messages.append(msg)
+                    except Exception as e:
+                        logger.error(
+                            f"[MQTT] Failed to create SensorMessage for {full_device_id}: {e}"
+                        )
+
         except Exception as e:
-            logger.error(f"[MQTT] Error processing message: {e}")
+            logger.error(f"[MQTT] Error during message processing: {e}")
             return
-
-        # Добавляем в буфер с контролем размера
-        self._buffer.extend(messages)
-        current_time = asyncio.get_event_loop().time()
-
-        # Оптимизированный условный flush
-        if (
-            len(self._buffer) >= self._batch_size
-            or current_time - self._last_flush >= self._flush_interval
-        ):
-            try:
-                await self._flush_buffer()
-                self._last_flush = current_time
-            except Exception as e:
-                logger.error(f"[MQTT] Flush buffer error: {e}")
-
-        # Оптимизированная публикация в Redis
         if messages:
+            self._buffer.extend(messages)
+            current_time = asyncio.get_event_loop().time()
+            if (
+                len(self._buffer) >= self._batch_size
+                or current_time - self._last_flush >= self._flush_interval
+            ):
+                try:
+                    await self._flush_buffer()
+                    self._last_flush = current_time
+                except Exception as e:
+                    logger.error(f"[MQTT] Flush buffer error: {e}")
             try:
-                # Ограничиваем количество параллельных задач
-                tasks = [
-                    publish_to_redis(self.redis_client, message) for message in messages
-                ]
+                tasks = [publish_to_redis(self.redis_client, msg) for msg in messages]
                 if tasks:
-                    await asyncio.gather(*tasks, return_exceptions=True)
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    for i, result in enumerate(results):
+                        if isinstance(result, Exception):
+                            logger.error(
+                                f"[MQTT] Redis publish failed for message {i}: {result}"
+                            )
             except Exception as e:
                 logger.error(f"[MQTT] Redis publish error: {e}")
+        else:
+            logger.debug(f"[MQTT] No valid sensor messages from topic {topic}")
 
     def _extract_device_id(self, topic: str) -> Optional[str]:
         parts = topic.strip("/").split("/")
