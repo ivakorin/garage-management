@@ -122,7 +122,7 @@ class MQTTCollector(BaseCollector):
                         )
                         continue
                     full_device_id = (
-                        f"{sensor_key.upper()}_{param_key.upper()}_{device_id}"
+                        f"{sensor_key.upper()}_{param_key.upper()}_{device_id.upper()}"
                     )
                     try:
                         msg = SensorMessage(
@@ -170,7 +170,7 @@ class MQTTCollector(BaseCollector):
 
     def _extract_device_id(self, topic: str) -> Optional[str]:
         parts = topic.strip("/").split("/")
-        return parts[-2] if len(parts) >= 2 else None
+        return parts[-1] if len(parts) >= 2 else None
 
     async def _flush_buffer(self):
         if not self._buffer:
