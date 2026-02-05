@@ -1,6 +1,11 @@
 import {api} from "../boot/axios.ts";
 import type {SensorsType, UpdateSensorType} from "../../types/sensors.ts";
 
+const deleteSensorAPI = async (device_id: string) => {
+    const response = await api.delete(`sensors/delete/${device_id}`)
+    return response.data
+}
+
 const fetchDevicesAPI = async () => {
     const response = await api.get('sensors/get/all')
     return response.data
@@ -23,4 +28,10 @@ const fetchSensorHistoryAPI = async (device_id: string) => {
     return response.data
 }
 
-export {updateDeviceAPI, fetchDevicesAPI, readDeviceAPI, fetchSensorHistoryAPI}
+export {
+    updateDeviceAPI,
+    fetchDevicesAPI,
+    readDeviceAPI,
+    fetchSensorHistoryAPI,
+    deleteSensorAPI
+}

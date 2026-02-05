@@ -30,6 +30,27 @@ class Plugins:
             logger.error(e)
 
     @staticmethod
+    async def stop(device_id: str, session: AsyncSession) -> PluginReadSchema:
+        stmt = (
+            update(PluginRegistry)
+            .where(PluginRegistry.device_id == device_id)
+            .values({"is_running": False})
+        )
+        try:
+            await session.execute(stmt)
+            get_plugin = select(PluginRegistry).where(
+                PluginRegistry.device_id == device_id
+            )
+            result = await session.execute(get_plugin)
+            plugin = result.scalars().first()
+            if plugin:
+                return PluginReadSchema.model_validate(plugin, from_attributes=True)
+            return None
+        except Exception as e:
+            await session.rollback()
+            logger.error(e)
+
+    @staticmethod
     async def update(data: PluginUpdateSchema, session: AsyncSession) -> PluginReadSchema:
         stmt = (
             update(PluginRegistry)

@@ -68,6 +68,16 @@ class SensorDataCRUD:
         await session.execute(update_stmt)
 
     @staticmethod
+    async def delete(device_id: str, session: AsyncSession) -> bool:
+        stmt = delete(Sensor).where(Sensor.device_id == device_id)
+        try:
+            await session.execute(stmt)
+            return True
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error deleting device {device_id}: {e}")
+
+    @staticmethod
     async def cleanup_old_data(
         session: AsyncSession, device_id: str, retention_days: int
     ):

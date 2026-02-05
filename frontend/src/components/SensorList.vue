@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref} from 'vue'
-import {fetchDevicesAPI} from '../api/sensors.ts'
+import {deleteSensorAPI, fetchDevicesAPI} from '../api/sensors.ts'
 import type {SensorsType} from "../../types/sensors.ts";
 import type {Widget} from "../composables/useDraggableWidgets.ts";
 import {PhPencil} from "@phosphor-icons/vue";
@@ -41,6 +41,11 @@ const addToDashboard = (device: SensorsType) => {
     height: 200
   }
   emit('add-widget', widget)
+}
+
+const deleteSensor = async (device_id: string) => {
+  await deleteSensorAPI(device_id)
+  devices.value = await fetchDevicesAPI()
 }
 
 const editItem = (item: SensorsType) => {
@@ -89,14 +94,24 @@ loadDevices()
         </n-p>
       </n-grid-item>
       <n-grid-item>
-        <n-button
-            size="tiny"
-            @click="addToDashboard(device)"
-            type="primary"
-            v-if="isEditing"
-        >
-          Add
-        </n-button>
+        <n-space>
+          <n-button
+              size="tiny"
+              @click="addToDashboard(device)"
+              type="primary"
+              v-if="isEditing"
+          >
+            Add
+          </n-button>
+          <n-button
+              size="tiny"
+              @click="deleteSensor(device.device_id)"
+              type="error"
+              v-if="isEditing"
+          >
+            Delete
+          </n-button>
+        </n-space>
       </n-grid-item>
     </n-grid>
   </div>
