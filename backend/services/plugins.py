@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import os
 import uuid
 from typing import get_type_hints
@@ -92,7 +93,17 @@ async def load_plugins(db_session: AsyncSession) -> dict:
                     try:
                         init_hints = get_type_hints(cls.__init__)
                         if "pin" in init_hints:
-                            kwargs["pin"] = 4  # Дефолтный пин
+                            init_sig = inspect.signature(cls.__init__)
+                            pin_param = init_sig.parameters.get("pin")
+                            if (
+                                pin_param
+                                and pin_param.default is not inspect.Parameter.empty
+                            ):
+                                kwargs["pin"] = (
+                                    pin_param.default
+                                )  # Берём дефолт из __init__
+                            else:
+                                kwargs["pin"] = 4  # Используем 4, если дефолта нет
                     except (TypeError, AttributeError):
                         pass
 
